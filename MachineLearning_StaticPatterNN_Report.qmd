@@ -1,0 +1,357 @@
+---
+title: "MachineLearning - StaticPatterNN"
+author: 
+  - name: "MSc. Friederike Johanna Rosa Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "https://friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: "2023-05-29"
+format: 
+  pdf:
+    toc: true
+    code-fold: true
+    code-overflow: wrap
+keep-tex: true
+---
+
+# Assignment for PhD Statistics class 2024
+
+------------------------------------------------------------------------
+
+## **Topic of Credit Report -- Statistical Methods** - Prague, 07.05.2024
+
+[Title of report:]{.underline} *Towards predicting temporal biodiversity change from static patterns*
+
+[Name:]{.underline} MSc. Friederike Wölke
+
+[Supervisor:]{.underline} Dr. Petr Keil
+
+[Thesis title:]{.underline} Universal imprints of temporal change in static spatial patterns of biodiversity
+
+[Expected methods applied:]{.underline}
+
+-   Machine learning [(random forest regression using the caret suite of tools for hyperparameter tuning)]{style="color:red;"}
+-   visualization of results.
+
+[Abstract:]{.underline}
+
+The world is undergoing significant environmental transformations, impacting biodiversity and ecosystem functions. Since obtaining temporal replication of biodiversity data is challenging due to cost and monitoring limitations, I aim at predicting temporal trends in species occupancy without requiring temporally replicated data.
+
+Biodiversity kinetics leave characteristics imprint in the spatial patterns that we can see from geo-referenced presence/absence data because the underlying processes such as extinction and colonization happen across space.
+
+I aim at predicting the log ratio of temporal change in occupancy (i.e., the sum of area occupied by a species) between two sampling periods from a set of predictor variables that are either related to **H1) species traits and ecology**, **H2)  geometric features of the species range from a single sampling period**, **H3) biodiversity equilibrium dynamics via spatial diversity patterns**,  or **H4) to the characteristics of the study region** -- all of which may equally contribute and act in concert to explaining the temporal process that is underlying the spatial pattern.
+
+For this I use high-quality, spatially continuous atlas data from four breeding bird atlases from temperate zones across the globe. Atlas data comes with spatial grids that enable easy up- and down scaling of the data.
+
+Here, I assess universal imprints of temporal change in breeding birds in Czech Republic, Japan, New York State and the whole of Europe across two aggregated sampling periods that took place pre-2000 and post-2000. Since data for two sampling periods are available, I will additionally test whether imprints in the spatial aggregation of species can better predict past or future biodiversity change.
+
+For this, I collated 60 predictor variables that vary across sampling periods - each belonging to one of the hypotheses mentioned above. I will use random forest regression to determine the capability of static patterns to predict temporal change, identify the most important predictor variables and compare observed versus predicted results.
+
+If my model can predict temporal change from static patterns, this method will be a useful tool for estimating temporal change in areas and for species where repeated monitoring might not be feasible. If the models are only partially able to predict temporal trends, the important predictors may still yield insights into how temporal processes are acting across space. Additionally disentangling whether imprints of biodiversity kinetics are better at explaining past versus future change may help to understand the temporal dimensions of the imprints.
+
+------------------------------------------------------------------------
+
+## Adjustments to the topic
+
+In June 2024, I attended the annual Macroecology & Biogeography meeting of the GfÖ society in Marburg, Germany, which was under the theme **Artificial Intelligence in Biogeography and Macroecology**. Talks and posters at the conference mostly concerned machine learning techniques for biodiversity research. Following a talk by Dr. Florian Hartig on perks and drawbacks of different machine learning methods for inference models, I decided to switch from the application of random forest models to neural networks since these are said to be more accurate for complex situations with many predictors. In his talk, Dr. Hartig elaborated about random forest being unable to predict with uncorrelated data since predictor variables included in the building of a certain tree tend to borrow strength from other predictors (which are not included) and therefore lead to false variable importance when extracted across the full forest.
+
+Moreover, inferring log ratio of AOO change may have been the wrong response variable to begin with for this project, since the distribution of this variable was predominantly centered around zero with few extreme cases of extreme increase or decrease, while predictor variables varied heavily, leading to the conclusion that there is just not enough signal in the log ratio for predictions.
+
+While I was investigating the issue of very low predictive power, I detected that, although the change in occupied area is most often zero, spatial patterns of species distributions do change, suggesting that a measure of turnover may be better suited to characterize the temporal change in species distributions. Hence, I calculated *Jaccard index of similarity* on species level across sites (i.e., the site-similarity for a species from one sampling period to the next), to capture the spatial change signal in the occupancy data.
+
+------------------------------------------------------------------------
+
+```{r}
+#| label: load-packages
+#| message: FALSE
+#| warning: FALSE
+rm(list = ls())
+source("src/functions.R")
+
+pckgs <- c("dplyr", "ggplot2", "reshape2", "caret", "ggcorrplot", "recipes", "cito", "plotly", "igraph", "ggraph")
+install_and_load(pckgs)
+
+# Neural Networks requirements:
+if(!require('torch',quietly = TRUE)) install.packages('torch')
+library('torch') 
+
+#install torch
+if(!torch_is_installed()) install_torch()
+
+```
+
+## The data
+
+Since the raw data is not open, I am providing the (reduced) predictor table that I calculated from it and other external data.
+
+The data has bird species in rows (`verbatim_name`) and their predictor data across different datasets (`dataset`) in columns.
+
+The column `log_R2_1` is the log ratio of AOO (area of occupancy) between two sampling periods (indicated with `tp = 1` or `tp = 2`) and was the inital response for my temporal change models.
+
+`Telfer_1_2` is another measure of temporal change, though it is relative for each species in a dataset in comparison to the average other species. Telfer will not be further investigated in this assignment.
+
+`Jaccard` is the Jaccard index of similarity and indicates how similar ( 0 - 1) two species ranges are across different sampling periods.
+
+# Preparations
+
+## Data handling
+
+Here I'm excluding some predictors which are overlapping with some others.
+
+Next, I'm splitting the data into their time periods. In the following I will only continue to investigate the change from period 1 to period 2 (i.e, future change).
+
+Some predictor columns have NAs that result from either very rare species or highly cosmopolitan species (thus resulting in division by 0 during computation). With knowledge of how I computed the predictors, I manually set some rows with NAs to 0 or 1.
+
+Spatial autocorrelation (Moran's I) cannot be calculated for species occupying 100% of an area, thus resulting in NA. These species are removed completely from the model as there is no way to impute this value.
+
+```{r}
+#| label: set-up-variables
+#| message: FALSE
+
+response <- "Jaccard"
+H1_vars <- c("AOO", "rel_occ_Ncells", "mean_prob_cooccur", "sd_PC1", "sd_PC2",
+             "GlobRangeSize_m2", "IUCN", "Mass", "Habitat", "Habitat.Density", 
+             "Migration", "Trophic.Level", "Trophic.Niche", "Primary.Lifestyle",
+             "FP", "Hand.Wing.Index")
+H2_vars <- c("D_AOO_a", "moran", "x_intercept", "sp_centr_lon", "sp_centr_lat",
+             "lengthMinRect", "widthMinRect", "elonMinRect", "bearingMinRect",
+             "circ", "bearing", "Southernness", "Westernness",
+             "rel_maxDist", "rel_ewDist", "rel_nsDist", "rel_elonRatio", 
+             "rel_relCirc", "rel_circNorm", "rel_lin", "Dist_centroid_to_COG",
+             "maxDist_toBorder_border", "maxDist_toBorder_centr", 
+             "minDist_toBorder_centr")
+H3_vars <- c("GammaSR", "AlphaSR_sp", "BetaSR_sp")
+H4_vars <- c("dataset", "mean_area", "Total_area_samp", "Total_Ncells_samp",
+             "mean_cell_length", "atlas_lengthMinRect", "atlas_widthMinRect",
+             "atlas_elonMinRect", "atlas_circ", "atlas_bearingMinRect",
+             "atlas_bearing","AtlasCOG_long", "AtlasCOG_lat")
+
+```
+
+```{r}
+#| label: load-data
+#| message: FALSE
+
+dat <- readRDS("data/AllPredictors.rds") %>%
+  # filter for highest resolution and first time period
+  filter(cell_grouping == 1 & exclude == 0 & tp == 1) %>%
+  # select necessary columns
+  select(all_of(c(response, H1_vars, H2_vars, H3_vars, H4_vars))) %>%
+  # Fixing NAs
+  mutate(
+    D_AOO_a = 
+      case_when(is.na(D_AOO_a) & rel_occ_Ncells > 0.97 ~ 2,
+                TRUE ~ D_AOO_a),
+    mean_prob_cooccur = 
+      case_when(is.na(mean_prob_cooccur) & rel_occ_Ncells < 0.05 ~ 0,
+                TRUE ~ mean_prob_cooccur)) %>%
+  # Delete those species occupying 100% of area (Moran's I = NA)
+  filter(!is.na(moran)) %>%
+  # Transform all characters to factors for modeling
+  mutate_if(is.character, as.factor)
+dat$Habitat.Density <- as.factor(dat$Habitat.Density)
+dat$Migration <- as.factor(dat$Migration)
+
+colSums(is.na(dat)) 
+# there are 3 rows with NAs 
+# these are species which recently split from their sister clades 
+# and thus no trait/distribution data was available
+# we will use knn-imputation to impute values that are NA for these species.
+
+```
+
+```{r}
+#| label: raw-visualization
+dat %>%
+    select(Jaccard, dataset) %>%
+    melt(id.vars = "dataset") %>%
+    ggplot(aes(x = value, fill = dataset))+
+          geom_histogram(bins = 30, color = "black") +
+          facet_wrap(~ variable, scales = "free_x") +
+          scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00"))+
+          theme_bw()+
+          labs(title = "Species-level Jaccard index of site-similarity",
+               x = "Jaccard",
+               y = "Frequency")+
+          facet_wrap(dataset  ~ .)
+
+```
+
+```{r}
+#| label: feature-plots
+#| fig.width: 8
+#| fig.height: 12
+
+library(caret)
+
+featurePlot(
+  x = dat %>% select(dataset, all_of(H1_vars)),
+  y = dat$Jaccard,
+  group = dat$dataset,
+  plot = "pairs",
+  pch = 16,
+  alpha = 0.3, 
+  cex = 0.2, 
+  xlab = "Scatterplot Matrix of species predictors",
+  par.settings = 
+    list(
+      fontsize=list(text=4)))
+
+featurePlot(
+  x = dat %>% select(dataset, all_of(H2_vars)),
+  y = dat$Jaccard,
+  group = dat$dataset,
+  plot = "pairs",
+  pch = 16,
+  alpha = 0.3, 
+  cex = 0.2, 
+  xlab = "Scatterplot Matrix of species geometry",
+  par.settings = 
+    list(
+      fontsize=list(text=4)))
+
+featurePlot(
+  x = dat %>% select(dataset, all_of(H3_vars)),
+  y = dat$Jaccard,
+  group = dat$dataset,
+  plot = "pairs",
+  pch = 16,
+  alpha = 0.3, 
+  cex = 0.2, 
+  xlab = "Scatterplot Matrix of diversity metrics",
+  par.settings = 
+    list(
+      fontsize=list(text=4)))
+
+featurePlot(
+  x = dat %>% select(dataset, all_of(H4_vars)),
+  y = dat$Jaccard,
+  group = dat$dataset,
+  plot = "pairs",
+  pch = 16,
+  alpha = 0.6, 
+  cex = 0.2, 
+  xlab = "Scatterplot Matrix of atlas specifics",
+  par.settings = 
+    list(
+      fontsize=list(text=4)))
+```
+
+```{r}
+#| label: correlation-matrix
+#| fig.width: 50
+#| fig.height: 50
+
+cor_df <- dat %>% select(-Jaccard)
+p.mat <-  model.matrix(~ 0 + ., data = cor_df) %>% 
+  cor_pmat()
+
+correlation_matrix <- cor_df %>% select_if(is.numeric) %>%
+  cor(use = "pairwise.complete.obs") 
+correlation_matrix %>% 
+  ggcorrplot(hc.order = TRUE,
+                         lab = TRUE,
+                         lab_size = 3,
+                         p.mat = p.mat,
+                         insig = "blank")
+
+# We will set the threshold for excluding correlations = 0.85 
+# this is a bit arbitrary, trying to find a good trade-off between loss of predictor variables and collinearity
+
+cor_vars <- findCorrelation(correlation_matrix, 
+                cutoff = .85, 
+                names = TRUE, 
+                exact = TRUE,
+                verbose = TRUE)
+cor_vars
+# 13 variables seemed to be highly correlated. We will exclude 
+
+model_dat <- dat %>% 
+  select(!all_of(cor_vars)) 
+
+colSums(is.na(model_dat))
+# leaves us with 39 predictor variables to predict Jaccard similarity index
+```
+
+## Modeling
+
+### Pre-processing:
+
+First we have to check if there are (near) zero variance variables in the predictors. These can be removed since they will not explain a lot generally.
+
+Second, we will exclude all correlated variables with pearson's pairwise correlations coefficients \> 0.85.
+
+Third, we will impute NA values based on knn-imputation with 5 neighbors (default).
+
+```{r}
+#| label: recipe-pre-processing
+
+# Step 1. Near Zero Vars
+nzv <- nearZeroVar(model_dat, saveMetrics = T)
+nzv %>% filter(nzv == T) 
+# only IUCN, but this is an important predictor (!) we will keep it.
+
+# Step 2 & 3: imputing missing values & removing highly correlated variables
+recipe_pp <- recipe(Jaccard ~ .,
+  data = dat) %>%
+  step_corr(all_numeric_predictors(), threshold = .85) %>%
+  step_impute_knn(all_predictors())
+
+# Estimate recipe on data:
+recipe_pp_prepped <- prep(recipe_pp, dat)
+
+# Removed columns:
+recipe_pp_prepped$steps[[1]]$removals
+
+# apply the recipe to the data:
+dat_v2 <- bake(recipe_pp_prepped, dat)
+
+```
+
+### Training & Validation sets:
+
+```{r}
+set.seed(42)
+indices <- createDataPartition(dat_v2$Jaccard, p = 0.8, 10) # 10 resamples
+
+```
+
+### Train Neural Network
+We will train 10 sets of neural networks (one for each resample of the data splitting)
+
+```{r}
+#| label: train-neural-network
+
+
+for (resamp in seq_along(indices)){
+
+  train_df <- dat_v2[indices[[resamp]],] # 826 rows 
+  test_df <- dat_v2[-indices[[resamp]],] # 204 rows
+  
+  nn_fit <- dnn(Jaccard ~ ., 
+                       data = train_df %>% select(Jaccard, AOO, D_AOO_a, IUCN),
+                       #validation = 0.2,
+                       hidden = c(50L, 50L),
+                       activation = "relu",
+                       loss = "mse",
+                       #lr = 0.0001,
+                       #epochs = 6000L,
+                       #lr_scheduler = config_lr_scheduler("reduce_on_plateau", patience = 10, factor = 0.5),
+                       plot = TRUE,
+                       tuning = config_optimizer("adam"),
+                       verbose = TRUE,
+                       bootstrap = 100)
+
+analyze_training(nn_fit)
+
+predictions <- predict(nn_fit, test_df)
+
+plot(test_df$Jaccard, predictions)
+
+summary(nn_fit)
+
+}
+
+
+```
