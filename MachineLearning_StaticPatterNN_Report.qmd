@@ -21,106 +21,44 @@ keep-tex: true
 
 ## **Topic of Credit Report -- Statistical Methods** - Prague, 07.05.2024
 
-[Title of report:]{.underline} *Towards predicting temporal biodiversity
-change from static patterns*
+[Title of report:]{.underline} *Towards predicting temporal biodiversity change from static patterns*
 
 [Name:]{.underline} MSc. Friederike Wölke
 
 [Supervisor:]{.underline} Dr. Petr Keil
 
-[Thesis title:]{.underline} Universal imprints of temporal change in
-static spatial patterns of biodiversity
+[Thesis title:]{.underline} Universal imprints of temporal change in static spatial patterns of biodiversity
 
 [Expected methods applied:]{.underline}
 
--   Machine learning [(random forest regression using the caret suite of
-    tools for hyperparameter tuning)]{style="color:red;"}
+-   Machine learning [(random forest regression using the caret suite of tools for hyperparameter tuning)]{style="color:red;"}
 -   visualization of results.
 
 [Abstract:]{.underline}
 
-The world is undergoing significant environmental transformations,
-impacting biodiversity and ecosystem functions. Since obtaining temporal
-replication of biodiversity data is challenging due to cost and
-monitoring limitations, I aim at predicting temporal trends in species
-occupancy without requiring temporally replicated data.
+The world is undergoing significant environmental transformations, impacting biodiversity and ecosystem functions. Since obtaining temporal replication of biodiversity data is challenging due to cost and monitoring limitations, I aim at predicting temporal trends in species occupancy without requiring temporally replicated data.
 
-Biodiversity kinetics leave characteristics imprint in the spatial
-patterns that we can see from geo-referenced presence/absence data
-because the underlying processes such as extinction and colonization
-happen across space.
+Biodiversity kinetics leave characteristics imprint in the spatial patterns that we can see from geo-referenced presence/absence data because the underlying processes such as extinction and colonization happen across space.
 
-I aim at predicting the log ratio of temporal change in occupancy (i.e.,
-the sum of area occupied by a species) between two sampling periods from
-a set of predictor variables that are either related to **H1) species
-traits and ecology**, **H2)  geometric features of the species range
-from a single sampling period**, **H3) biodiversity equilibrium dynamics
-via spatial diversity patterns**,  or **H4) to the characteristics of
-the study region** -- all of which may equally contribute and act in
-concert to explaining the temporal process that is underlying the
-spatial pattern.
+I aim at predicting the log ratio of temporal change in occupancy (i.e., the sum of area occupied by a species) between two sampling periods from a set of predictor variables that are either related to **H1) species traits and ecology**, **H2)  geometric features of the species range from a single sampling period**, **H3) biodiversity equilibrium dynamics via spatial diversity patterns**,  or **H4) to the characteristics of the study region** -- all of which may equally contribute and act in concert to explaining the temporal process that is underlying the spatial pattern.
 
-For this I use high-quality, spatially continuous atlas data from four
-breeding bird atlases from temperate zones across the globe. Atlas data
-comes with spatial grids that enable easy up- and down scaling of the
-data.
+For this I use high-quality, spatially continuous atlas data from four breeding bird atlases from temperate zones across the globe. Atlas data comes with spatial grids that enable easy up- and down scaling of the data.
 
-Here, I assess universal imprints of temporal change in breeding birds
-in Czech Republic, Japan, New York State and the whole of Europe across
-two aggregated sampling periods that took place pre-2000 and post-2000.
-Since data for two sampling periods are available, I will additionally
-test whether imprints in the spatial aggregation of species can better
-predict past or future biodiversity change.
+Here, I assess universal imprints of temporal change in breeding birds in Czech Republic, Japan, New York State and the whole of Europe across two aggregated sampling periods that took place pre-2000 and post-2000. Since data for two sampling periods are available, I will additionally test whether imprints in the spatial aggregation of species can better predict past or future biodiversity change.
 
-For this, I collated 60 predictor variables that vary across sampling
-periods - each belonging to one of the hypotheses mentioned above. I
-will use random forest regression to determine the capability of static
-patterns to predict temporal change, identify the most important
-predictor variables and compare observed versus predicted results.
+For this, I collated 60 predictor variables that vary across sampling periods - each belonging to one of the hypotheses mentioned above. I will use random forest regression to determine the capability of static patterns to predict temporal change, identify the most important predictor variables and compare observed versus predicted results.
 
-If my model can predict temporal change from static patterns, this
-method will be a useful tool for estimating temporal change in areas and
-for species where repeated monitoring might not be feasible. If the
-models are only partially able to predict temporal trends, the important
-predictors may still yield insights into how temporal processes are
-acting across space. Additionally disentangling whether imprints of
-biodiversity kinetics are better at explaining past versus future change
-may help to understand the temporal dimensions of the imprints.
+If my model can predict temporal change from static patterns, this method will be a useful tool for estimating temporal change in areas and for species where repeated monitoring might not be feasible. If the models are only partially able to predict temporal trends, the important predictors may still yield insights into how temporal processes are acting across space. Additionally disentangling whether imprints of biodiversity kinetics are better at explaining past versus future change may help to understand the temporal dimensions of the imprints.
 
 ------------------------------------------------------------------------
 
 ## Adjustments to the topic
 
-In June 2024, I attended the annual Macroecology & Biogeography meeting
-of the GfÖ society in Marburg, Germany, which was under the theme
-**Artificial Intelligence in Biogeography and Macroecology**. Talks and
-posters at the conference mostly concerned machine learning techniques
-for biodiversity research. Following a talk by Dr. Florian Hartig on
-perks and drawbacks of different machine learning methods for inference
-models, I decided to switch from the application of random forest models
-to neural networks since these are said to be more accurate for complex
-situations with many predictors. In his talk, Dr. Hartig elaborated
-about random forest being unable to predict with uncorrelated data since
-predictor variables included in the building of a certain tree tend to
-borrow strength from other predictors (which are not included) and
-therefore lead to false variable importance when extracted across the
-full forest.
+In June 2024, I attended the annual Macroecology & Biogeography meeting of the GfÖ society in Marburg, Germany, which was under the theme **Artificial Intelligence in Biogeography and Macroecology**. Talks and posters at the conference mostly concerned machine learning techniques for biodiversity research. Following a talk by Dr. Florian Hartig on perks and drawbacks of different machine learning methods for inference models, I decided to switch from the application of random forest models to neural networks since these are said to be more accurate for complex situations with many predictors. In his talk, Dr. Hartig elaborated about random forest being unable to predict with uncorrelated data since predictor variables included in the building of a certain tree tend to borrow strength from other predictors (which are not included) and therefore lead to false variable importance when extracted across the full forest.
 
-Moreover, inferring log ratio of AOO change may have been the wrong
-response variable to begin with for this project, since the distribution
-of this variable was predominantly centered around zero with few extreme
-cases of extreme increase or decrease, while predictor variables varied
-heavily, leading to the conclusion that there is just not enough signal
-in the log ratio for predictions.
+Moreover, inferring log ratio of AOO change may have been the wrong response variable to begin with for this project, since the distribution of this variable was predominantly centered around zero with few extreme cases of extreme increase or decrease, while predictor variables varied heavily, leading to the conclusion that there is just not enough signal in the log ratio for predictions.
 
-While I was investigating the issue of very low predictive power, I
-detected that, although the change in occupied area is most often zero,
-spatial patterns of species distributions do change, suggesting that a
-measure of turnover may be better suited to characterize the temporal
-change in species distributions. Hence, I calculated *Jaccard index of
-similarity* on species level across sites (i.e., the site-similarity for
-a species from one sampling period to the next), to capture the spatial
-change signal in the occupancy data.
+While I was investigating the issue of very low predictive power, I detected that, although the change in occupied area is most often zero, spatial patterns of species distributions do change, suggesting that a measure of turnover may be better suited to characterize the temporal change in species distributions. Hence, I calculated *Jaccard index of similarity* on species level across sites (i.e., the site-similarity for a species from one sampling period to the next), to capture the spatial change signal in the occupancy data.
 
 ------------------------------------------------------------------------
 
@@ -145,44 +83,27 @@ if (!torch_is_installed()) install_torch()
 
 ## The data
 
-Since the raw data is not open, I am providing the (reduced) predictor
-table that I calculated from it and other external data.
+Since the raw data is not open, I am providing the (reduced) predictor table that I calculated from it and other external data.
 
-The data has bird species in rows (`verbatim_name`) and their predictor
-data across different datasets (`dataset`) in columns.
+The data has bird species in rows (`verbatim_name`) and their predictor data across different datasets (`dataset`) in columns.
 
-The column `log_R2_1` is the log ratio of AOO (area of occupancy)
-between two sampling periods (indicated with `tp = 1` or `tp = 2`) and
-was the inital response for my temporal change models.
+The column `log_R2_1` is the log ratio of AOO (area of occupancy) between two sampling periods (indicated with `tp = 1` or `tp = 2`) and was the inital response for my temporal change models.
 
-`Telfer_1_2` is another measure of temporal change, though it is
-relative for each species in a dataset in comparison to the average
-other species. Telfer will not be further investigated in this
-assignment.
+`Telfer_1_2` is another measure of temporal change, though it is relative for each species in a dataset in comparison to the average other species. Telfer will not be further investigated in this assignment.
 
-`Jaccard` is the Jaccard index of similarity and indicates how similar (
-0 - 1) two species ranges are across different sampling periods.
+`Jaccard` is the Jaccard index of similarity and indicates how similar ( 0 - 1) two species ranges are across different sampling periods.
 
 # Preparations
 
 ## Data handling
 
-Here I'm excluding some predictors which are overlapping with some
-others.
+Here I'm excluding some predictors which are overlapping with some others.
 
-Next, I'm splitting the data into their time periods. In the following I
-will only continue to investigate the change from period 1 to period 2
-(i.e, future change).
+Next, I'm splitting the data into their time periods. In the following I will only continue to investigate the change from period 1 to period 2 (i.e, future change).
 
-Some predictor columns have NAs that result from either very rare
-species or highly cosmopolitan species (thus resulting in division by 0
-during computation). With knowledge of how I computed the predictors, I
-manually set some rows with NAs to 0 or 1.
+Some predictor columns have NAs that result from either very rare species or highly cosmopolitan species (thus resulting in division by 0 during computation). With knowledge of how I computed the predictors, I manually set some rows with NAs to 0 or 1.
 
-Spatial autocorrelation (Moran's I) cannot be calculated for species
-occupying 100% of an area, thus resulting in NA. These species are
-removed completely from the model as there is no way to impute this
-value.
+Spatial autocorrelation (Moran's I) cannot be calculated for species occupying 100% of an area, thus resulting in NA. These species are removed completely from the model as there is no way to impute this value.
 
 ```{r}
 #| label: set-up-variables
@@ -379,15 +300,11 @@ colSums(is.na(model_dat))
 
 ### Pre-processing:
 
-First we have to check if there are (near) zero variance variables in
-the predictors. These can be removed since they will not explain a lot
-generally.
+First we have to check if there are (near) zero variance variables in the predictors. These can be removed since they will not explain a lot generally.
 
-Second, we will exclude all correlated variables with pearson's pairwise
-correlations coefficients \> 0.85.
+Second, we will exclude all correlated variables with pearson's pairwise correlations coefficients \> 0.85.
 
-Third, we will impute NA values based on knn-imputation with 5 neighbors
-(default).
+Third, we will impute NA values based on knn-imputation with 5 neighbors (default).
 
 ```{r}
 #| label: recipe-pre-processing
@@ -617,8 +534,12 @@ save.image("data/rfe.RData")
 ```
 
 ```{r}
+#| label: rfe-results
+#| fig.height: 10
+#| fig.width: 8
 
-load("data/rfe.RData")
+
+load("./data/rfe.RData")
 
 results <- replicate(10, list())
 for(i in seq_along(1:length(saved_profiles))){
@@ -680,6 +601,35 @@ ggplot(data = res_top_vars_df, aes(fill= as.factor(include), y = reorder(var, Im
     scale_fill_manual(values = c("#D55E00","#009E73")) +
     theme(legend.position = "right") +
     labs(title = "Top Variables by Importance", x = "Importance", y = "Variable")
+
+
+
+### Combined =====
+
+# Calculate the maximum count of resamples for scaling
+max_count <- res_top_vars_df %>% count(var) %>% pull(n) %>% max()
+
+# Combined plot with aligned secondary axis
+ggplot(data = res_top_vars_df) +
+  # Background rectangles
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 10.5), fill = "lightgray", alpha = 0.9) +
+  # Box plot
+  geom_boxplot(aes(y = reorder(var, Imp), x = Imp)) +
+  # Bar plot scaled to the secondary axis
+  geom_bar(aes(y = reorder(var, Imp), x = after_stat(count) / max_count * max(res_top_vars_df$Imp), fill = factor(include)), 
+           stat = "count",  alpha = 0.3) +
+  # Horizontal line
+  geom_hline(yintercept = 10.5) +
+  # Secondary axis that stretches through the entire range
+  scale_x_continuous(sec.axis = sec_axis(~ . * max_count / max(res_top_vars_df$Imp), name = "Count Resamples (Secondary Axis)")) +
+  geom_text(aes(x = 10.5, y = 10.5, label = paste("*")), 
+            col = "#D55E00", hjust = -3.2, vjust = 0.7, cex = 5) +
+  # Scale and theme
+  scale_fill_manual(values = c("#D55E00", "#009E73")) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs(title = "Top Variables by Importance", x = "Importance", y = "Variable")
+
 
 ```
 
@@ -844,7 +794,6 @@ ggplot(aes(observed, prediction), data = test_performance_xgb)+
     theme_bw()
 ```
 
-
 ```{r}
 # Train gbm model
 gbm_grid <-  expand.grid(interaction.depth = 15, 
@@ -882,6 +831,7 @@ ggplot(aes(observed, prediction), data = test_performance_gbm)+
 ```
 
 ### Compare models
+
 ```{r}
 # Prediction error for test data ============
 test_error_all <- data.frame(
@@ -1006,10 +956,10 @@ Dependence Plots")+
 
 
 ```
+
 ### Ensemble model
 
-Now we will compare randomForest to boosed regression trees or extreme
-gradient boosting.
+Now we will compare randomForest to boosed regression trees or extreme gradient boosting.
 
 ```{r}
 pckgs2 <- c("caret", "caretEnsemble", "gbm", "xgboost", "kableExtra")
@@ -1066,8 +1016,7 @@ varImp(modelsList[[3]])
 
 ### Train Neural Network
 
-We will train 10 sets of neural networks (one for each resample of the
-data splitting)
+We will train 10 sets of neural networks (one for each resample of the data splitting)
 
 ```{r}
 #| label: train-neural-network
