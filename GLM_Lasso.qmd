@@ -1,0 +1,103 @@
+---
+title: "GLM - LASSO"
+author: "Frieda"
+format: html
+editor: visual
+---
+
+# Extra: GLM - Coefficients
+
+To get an idea of how predictors influence temporal change, I additionally run a general linear model to get some coefficients. Since many predictors are included, I'll use Lasso regularization to reduce the number of predictors in the model.
+
+### Feature selection: LASSO
+
+**Result:**
+
+-   most important features:
+-   25 predictors selected - 16 predictor variables (some of these are factors and thus accounted individually)
+
+```{r, fig.height =12 , fig.width=10}
+load("Assignment_ws_rfFuncs.RData")
+library(glmnet)
+set.seed(42)
+
+# Prepare the data for LASSO
+# centering & scaling numeric variables
+x <- cbind(trainData[, -c(1:3)] %>% 
+             select(!where(is.numeric)), 
+           scale(trainData[, -c(1:3)] %>% 
+                   select(where(is.numeric)), center=T, scale = T))
+x <- makeX(x, na.impute = T, sparse = T)  # Exclude the response variable; transforms factors to individual predictors
+
+y <- trainData$log_R2_1 # Response variable
+
+# Apply LASSO using cross-validation to find the optimal lambda
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+
+# Extract the best lambda value
+best_lambda <- cv_lasso$lambda.min
+
+# Fit the LASSO model with the best lambda
+lasso_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+# Identify the non-zero coefficients (rounded to 4 digests)
+selected_features <- coef(lasso_model)[,1] %>% 
+  as.data.frame() %>% round(4) %>%
+  filter(. != 0)
+selected_features$var <- row.names(selected_features)
+selected_features <- selected_features[-1,]
+  
+# Print the selected features
+print(selected_features)
+
+
+ggplot(selected_features, aes(y = var, x = ., col = .))+
+  geom_point()+
+  theme_bw()+
+  scale_color_distiller(palette = 4, type = "div", direction = 1)+
+  labs(title = "Estimated coefficients (GLM)")
+
+
+
+
+
+#### 
+set.seed(42)
+
+# Prepare the data for LASSO
+# centering & scaling numeric variables
+x0 <- cbind(trainData[, -c(1:3)] %>% 
+             select(!where(is.numeric)), 
+           scale(trainData[, -c(1:3)] %>% 
+                   select(where(is.numeric)), center=T, scale = T))
+x0 <- makeX(x0, na.impute = T, sparse = T)  # Exclude the response variable; transforms factors to individual predictors
+
+y0 <- trainData$log_R2_1 # Response variable
+
+# Apply LASSO using cross-validation to find the optimal lambda
+cv_lasso0 <- cv.glmnet(x0, y0, alpha = 0)
+
+# Extract the best lambda value
+best_lambda0 <- cv_lasso0$lambda.min
+
+# Fit the LASSO model with the best lambda
+lasso_model0 <- glmnet(x, y, alpha = 0, lambda = best_lambda0)
+
+# Identify the non-zero coefficients (rounded to 4 digests)
+selected_features0 <- coef(lasso_model0)[,1] %>% 
+  as.data.frame() %>% round(4) %>%
+  filter(. != 0)
+selected_features0$var <- row.names(selected_features0)
+selected_features0 <- selected_features0[-1,]
+  
+# Print the selected features
+print(selected_features0)
+
+
+ggplot(selected_features0, aes(y = var, x = ., col = .))+
+  geom_point()+
+  theme_bw()+
+  scale_color_distiller(palette = 4, type = "div", direction = 1)+
+  labs(title = "Estimated coefficients (GLM)")
+
+```

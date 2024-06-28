@@ -1,0 +1,1202 @@
+---
+title: "Report - Assignment for PhD Stats class 2024"
+author: 
+  - name: "Friederike Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: 29.05.2024
+format: pdf
+code-overflow: wrap
+toc: true
+editor: visual
+render-on-save: true
+code-fold: true
+keep-tex: true
+---
+
+# Assignment for PhD Stats class 2024
+
+## **Topic of Credit Report -- Statistical Methods** - Prague, 07.05.2024
+
+[Title of report:]{.underline} *Towards predicting temporal biodiversity change from static patterns*
+
+[Name:]{.underline} MSc. Friederike Wölke
+
+[Supervisor:]{.underline} Dr. Petr Keil
+
+[Thesis title:]{.underline} Universal imprints of temporal change in static spatial patterns of biodiversity
+
+[**Expected methods applied:**]{.underline} Machine learning (random forest regression using the caret suite of tools for hyperparameter tuning), visualization of results.
+
+[Abstract:]{.underline}
+
+The world is undergoing significant environmental transformations, impacting biodiversity and ecosystem functions. Since obtaining temporal replication of biodiversity data is challenging due to cost and monitoring limitations, I aim at predicting temporal trends in species occupancy without requiring temporally replicated data.
+
+Biodiversity kinetics leave characteristics imprint in the spatial patterns that we can see from geo-referenced presence/absence data because the underlying processes such as extinction and colonization happen across space.
+
+I aim at predicting the log ratio of temporal change in occupancy (i.e., the sum of area occupied by a species) between two sampling periods from a set of predictor variables that are either related to **H1) species traits and ecology**, **H2)  geometric features of the species range from a single sampling period**, **H3) biodiversity equilibrium dynamics via spatial diversity patterns**,  or **H4) to the characteristics of the study region** -- all of which may equally contribute and act in concert to explaining the temporal process that is underlying the spatial pattern.
+
+For this I use high-quality, spatially continuous atlas data from four breeding bird atlases from temperate zones across the globe. Atlas data comes with spatial grids that enable easy up- and downscaling of the data.
+
+Here, I assess universal imprints of temporal change in breeding birds in Czech Republic, Japan, New York State and the whole of Europe across two aggregated sampling periods that took place pre-2000 and post-2000. Since data for two sampling periods are available, I will additionally test whether imprints in the spatial aggregation of species can better predict past or future biodiversity change.
+
+For this, I collated 60 predictor variables that vary across sampling periods - each belonging to one of the hypotheses mentioned above. I will use random forest regression to determine the capability of static patterns to predict temporal change, identify the most important predictor variables and compare observed versus predicted results.
+
+If my model can predict temporal change from static patterns, this method will be a useful tool for estimating temporal change in areas and for species where repeated monitoring might not be feasible. If the models are only partially able to predict temporal trends, the important predictors may still yield insights into how temporal processes are acting across space. Additionally disentangling whether imprints of biodiversity kinetics are better at explaining past versus future change may help to understand the temporal dimensions of the imprints.
+
+# Miscellaneous
+
+## Libraries
+
+I will use the caret package for the implemented machine learning models.
+
+```{r, libraries, message = FALSE, warning = FALSE, code-fold = TRUE}
+# Clean environment before starting
+rm(list = ls())
+
+source("functions.R") # function to load packages
+
+pckgs <- c(
+  "dplyr", "ggplot2", "reshape2", # Data shaping
+  "caret", "ranger", "recipes", "randomForest", "glmnet", # Machine Learning
+  "xtable", "styler", "lintr")  # Code/output formater
+
+install_and_load(pckgs)
+
+rm(pckgs)
+```
+
+## Read data
+
+Since the raw data is not open, I am providing the (reduced) predictor table that I calculated from it and other external data.
+
+The data has bird species in rows and their predictor data across different datasets in columns. The column 'Jaccard' is the log ratio of AOO (area of occupancy) between two time periods (indicated with tp = 1 or tp = 2) and was the inital response for my temporal change models. 'Telfer_1_2' is another measure of temporal change, though it is relative for each species in a dataset in comparison to the average other species. Telfer will not be further investigated in this assignment. Jaccard is the Jaccard index of similarity and indicates how similar ( 0 - 1) two species ranges are across different sampling periods.
+
+The initial project was about predicting log Ratio of AOO change as an indicator of temporal change. However, the signal in the response was very weak and the log Ratio did not capture highly dynamic species with stable occupancy (i.e, those species with log ratio \~ 0 but Jaccard \~ 0).
+
+# Preparations
+
+## Data handling
+
+Here I'm excluding some predictors which are overlapping with some others.
+
+Next, I'm splitting the data into their time periods. In the following I will only continue to investigate the change from period 1 to period 2 (i.e, future change).
+
+Some predictor columns have NAs that result from either very rare species or highly cosmopolitan species (thus resulting in division by 0 during computation). With knowledge of how I computed the predictors, I manually set some rows with NAs to 0 or 1.
+
+Spatial autocorrelation (Moran's I) cannot be calculated for species occupying 100% of an area, thus resulting in NA. These species are removed completely from the model as there is no way to impute this value.
+
+```{r, jaccard}
+dat <- readRDS("../../../out/rds/AllPredictors.rds")
+
+names(dat)
+
+dat0 <- dat %>%
+  # Subset to highest resolution (smallest grid size) & first sampling period
+  filter(cell_grouping == 1 & exclude == 0 & tp == 1) %>%
+  select(
+    # Response / species ID (remove verbatim_name before modelling)
+    verbatim_name, Jaccard, log_R2_1, Telfer_1_2,
+    # Atlas specifics: [4:8]
+    dataset, mean_area, Total_area_samp, Total_Ncells_samp, mean_cell_length,
+    # Diversity metrics [9:11]
+    GammaSR, AlphaSR_sp, BetaSR_sp,
+    # Occupancy [12:15]
+    AOO, rel_occ_Ncells, D_AOO_a, mean_prob_cooccur,
+    # BirdLife data [16:19]
+    sd_PC1, sd_PC2, GlobRangeSize_m2, IUCN,
+    # Spatial autocorrelation [20:21]
+    moran, x_intercept,
+    # AVONET [22:30]
+    Mass, Habitat, Habitat.Density, Migration, Trophic.Level, Trophic.Niche, Primary.Lifestyle, FP, Hand.Wing.Index,
+    # Species range centroid [31:32]
+    sp_centr_lon, sp_centr_lat,
+    # Geometry1: [33:36]
+    lengthMinRect, widthMinRect, elonMinRect, bearingMinRect,
+    # Geometry2: [37:40]
+    circ, bearing, Southernness, Westernness,
+    # Geometry3: [41:47]
+    rel_maxDist, rel_ewDist, rel_nsDist, rel_elonRatio, rel_relCirc, rel_circNorm, rel_lin,
+    # Geometry4: [48:51]
+    Dist_centroid_to_COG, maxDist_toBorder_border, maxDist_toBorder_centr, minDist_toBorder_centr,
+    # Geometry 5: [52:59]
+    atlas_lengthMinRect, atlas_widthMinRect, atlas_elonMinRect, atlas_circ,
+    atlas_bearingMinRect, atlas_bearing, AtlasCOG_long, AtlasCOG_lat
+  ) %>%
+  # Fixing some NAs:
+  mutate(
+    D_AOO_a =
+      case_when(is.na(D_AOO_a) & rel_occ_Ncells > 0.97 ~ 2, TRUE ~ D_AOO_a),
+    mean_prob_cooccur =
+      case_when(is.na(mean_prob_cooccur) & rel_occ_Ncells < 0.05 ~ 0, TRUE ~ mean_prob_cooccur)
+  ) %>%
+  # Delete species with NA in Spatial Autocorrelationn (i.e., those species occupying 100% of area)
+  filter(!is.na(moran)) %>%
+  # Simplify data and remove replicated rows
+  distinct(verbatim_name, dataset, .keep_all = TRUE) %>%
+  # Transform all characters to factors for modeling
+  mutate_if(is.character, as.factor)
+
+str(dat0)
+```
+
+There are some NAs left in the data. We will impute these later using knn-imputation. Some of these NAs derive from computation problems for some of the predictors, missing data for 3 species that were recently split from their sister clades and thus no unique trait or global range data was available. Otherwise, there should not be any other NAs.
+
+## Raw data visualization
+
+First we'll have a look at the distribution of the predictor variables. Although randomForest models are able to capture complex data, we want to see how much the data deviates from normal distributions and how much of the variation is based on the specific dataset (i.e., Europe, Czech republic, Japan, New York state).
+
+### Histograms
+
+Some variables are highly skewed and we could consider transforming them. However, since random forest should be able to capture complex patterns, we will keep them raw for now. Transformation of the data can artificially introduce relationships between variables that is not found in the raw data, thus, instead of using models that require linear relationships and un-skewed data, I chose to use a model that can capture complex patterns without these assumptions.
+
+*Results:*
+
+The figures show that much of the variation in the data is due to the study region (i.e, '`dataset`'). However, besides the differences in response magnitude, I cannot visually determine any variables that behave differently to the response for any study region. Thus we will run the model for the whole dataset which includes breeding birds in 1) Czech Republic, 2) Europe, 3) Japan and 4) New York state.
+
+```{r, response-hist-visualization-raw1, fig.height = 6, fig.width = 8}
+# Visualize data ====
+
+## Temporal change - Response
+dat0 %>%
+  select(Jaccard, log_R2_1, Telfer_1_2, dataset) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~variable, scales = "free_x") +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Responses, i.e. temporal change",
+    x = "Value",
+    y = "Frequency"
+  )
+
+# Link between Log ratio of Net Change and Jaccard index of similarity
+dat0 %>%
+  select(Jaccard, log_R2_1, Telfer_1_2, dataset) %>%
+  ggplot(aes(x = log_R2_1, y = Jaccard, col = dataset)) +
+  geom_point() +
+  geom_vline(xintercept = 0) +
+  theme_bw() +
+  scale_color_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  labs(
+    title = "Log Ratio ~ Jaccard",
+    x = "Log Ratio",
+    y = "Jaccard"
+  )
+
+
+# Detail plot of Jaccard index across study regions
+dat0 %>%
+  select(dataset, Jaccard) %>%
+  ggplot(aes(x = Jaccard, fill = dataset)) +
+  geom_density(alpha = 0.6) +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Jaccard index of Similarity",
+    x = "Value",
+    y = "Frequency"
+  )
+
+# Density plot of Log Ratio across study regions
+dat0 %>%
+  select(dataset, log_R2_1) %>%
+  ggplot(aes(x = log_R2_1, fill = dataset)) +
+  geom_density(alpha = 0.6) +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Net change",
+    x = "Value",
+    y = "Frequency"
+  )
+
+
+# Remove unneccessary columns for modeling:
+dat <- dat0 %>% select(-verbatim_name, -Telfer_1_2, -log_R2_1)
+```
+
+The density graph of the Jaccard index shows that there are marked differences in species ranges in New York and Japan, but lesser so in Europe or Czech Republic between sampling periods. This suggests higher species turnover across space in NY and Japan, although the distribution for New York species is bimodal with another much lower peak at higher similarity values. The distribution for birds in Czechia is likewise bimodal/trimodal, but all peaks are shifted towards higher similarity between sampling periods.
+
+```{r, visualization-raw2, fig.height = 18, fig.width= 18}
+# Visualize data ====
+
+## Species predictors
+dat %>%
+  select(starts_with("atlas"), starts_with("Atlas"), mean_area, Total_area_samp, Total_Ncells_samp, mean_cell_length, GammaSR, dataset) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~variable, scales = "free_x") +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Histograms of All Atlas Columns",
+    x = "Value",
+    y = "Frequency"
+  )
+
+## Atlas predictors
+dat %>%
+  select(-starts_with("atlas"), -starts_with("Atlas"), -mean_area, -Total_area_samp, -Total_Ncells_samp, -mean_cell_length, -GammaSR, ) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black") +
+  facet_wrap(~variable, scales = "free_x") +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Histograms of All Species Columns",
+    x = "Value",
+    y = "Frequency"
+  )
+```
+
+### Feature Plots
+
+Next, let's look at the interactions between variables using featurePlots with points colored by dataset.
+
+First, a huge figure with all data for manual inspection of all interactions between variables.
+
+***Color legend for groups:***
+
+``` Czechia = blue (``"#0072B2")``; ```
+
+``` Japan = green (``"#E69F00")``; ```
+
+``` Europe = yellow (``"#009E73")``; ```
+
+``` New York = orange (``"#D55E00") ```
+
+```{r, fig.height = 100, fig.width = 100, eval = FALSE, include = TRUE}
+png("featureplot_all_jacc.png", width = 10000, height = 10000, units = "px")
+featurePlot(
+  x = dat,
+  y = dat$Jaccard,
+  group = dat$dataset,
+  plot = "pairs"
+)
+dev.off()
+```
+
+![*Figure 1*: All Correlations between variables in the dataset to predict temporal change from static patterns. The top row depicts the response (Jaccard) and relationships between the response and the predictors. All other rows show the pairwise relationships between predictors. Points are colored by study region, where blue = Czechia, yellow = Europe, green = Japan, Orange = New York.](featureplot_all_jacc.png){fig-align="center"}
+
+Since this is not helpful due to the overwhelming amount of data, we will do feature plots for likely correlated features now.
+
+*Results*:
+
+We can find many relationships between predictor variables in the feature plots, indicated by the clustering of points along a curve / line. We will use a correlation analysis to identify highly correlated variables (R \> 0.85) and compute PCA for these.
+
+```{r, visualization-raw2, fig.height = 20, fig.width= 22}
+# Feature plots =====
+
+feature_plots <- list(
+  Atlas_Scale = featurePlot(
+    x = dat[3:6],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Atlas-Scale specifics",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Diversity_Metrics = featurePlot(
+    x = dat[7:9],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Diversity Metrics",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Occu_Metrics = featurePlot(
+    x = dat[10:13],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Occupancy measures",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Sp_Traits = featurePlot(
+    x = dat[c(14:17, 20:28)],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Species Traits",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  SAC = featurePlot(
+    x = dat[18:19],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Spatial autocorrelation",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Sp_Centroids = featurePlot(
+    x = dat[29:30],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Species range centroids",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  MinRect_Metrics = featurePlot(
+    x = dat[31:34],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Range min rectangle measures (Geometry)",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Range_Metrics = featurePlot(
+    x = dat[35:38],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Range measures (Geometry)",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Relative_Metrics = featurePlot(
+    x = dat[39:45],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Range relative to Atlas measures (Geometry)",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  RangeDistance_Metrics = featurePlot(
+    x = dat[46:49],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Range distance measures",
+    pch = 16,
+    alpha = 0.3, cex = 2, xlab = "Scatterplot Matrix"
+  ),
+  Atlas_Geometry = featurePlot(
+    x = dat[50:57],
+    y = dat$Jaccard,
+    group = dat$dataset,
+    plot = "pairs",
+    main = "Atlas Geometry",
+    pch = 16,
+    alpha = 0.3,
+    cex = 2,
+    xlab = "Scatterplot Matrix"
+  )
+)
+
+
+print(feature_plots)
+```
+
+### Correlation Matrix
+
+This correlation matrix includes dummy variables for all factors / groups.
+
+```{r, cor-mat, fig.height = 20, fig.width = 20}
+cor_df <- dat %>% select(-Jaccard)
+
+# First: Convert factors to dummy variables
+p.mat <- model.matrix(~ 0 + ., data = cor_df) %>%
+  ggcorrplot::cor_pmat()
+
+correlation_matrix <- model.matrix(~ 0 + ., data = cor_df) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  ggcorrplot::ggcorrplot(
+    hc.order = TRUE,
+    lab = TRUE,
+    lab_size = 3,
+    p.mat = p.mat,
+    insig = "blank"
+  )
+
+# Save Plot =====
+png("correlation_matrix.png", width = 1500, height = 1500, units = "px")
+correlation_matrix
+dev.off()
+
+
+
+# Second: Extract correlations to dataframe (only numeric)
+cor_matrix <- cor_df %>%
+  select_if(is.numeric) %>%
+  cor(use = "pairwise.complete.obs") %>%
+  as.table() %>%
+  as.data.frame() %>%
+  filter(Var1 != Var2) # Remove self-correlations
+
+# Grab highly correlated variables
+highly_correlated <- cor_matrix %>%
+  filter(abs(Freq) > 0.65) # Adjust threshold as needed
+highly_correlated
+
+unique(highly_correlated$Var1)
+unique(highly_correlated$Var2)
+cor_vars <- c(highly_correlated$Var2, highly_correlated$Var1) %>% unique()
+
+cor_vars # we will use these variables during processing to construct PCA
+
+rm(cor_df, cor_matrix, correlation_matrix, highly_correlated, p.mat)
+```
+
+# Machine Learning
+
+I will use a random forest regression model to determine the predictive strength of static predictors for future temporal change.
+
+## Pre-Processing
+
+So far, I have a set of 43 predictor variables to infer the response variable 'Jaccard'. Most of these are calculated from the spatial data and thus may be correlated. We will remove very high correlations \> 0.9 using the PreProcess() function for the full dataset. In addition, we will use median imputation to fix any NAs that do not result from extreme data points.
+
+Additionally we will check for variables with low variance, since these inherently will not explain much of the response.
+
+Since random forest models do not estimate coefficients, scaling and centering is not necessary.
+
+### 1. Near Zero Variables & Correlations
+
+We will remove correlations \> 0.9 because these cannot be discerned anyway. This will leave us with 43 predictor variables in total which will go into the primary model & subsequent feature selection and hyperparameter tuning.
+
+*Results*:
+
+The prepared recipe shows that
+
+```{r, Jaccard-model-preprocessing}
+# Pre-processing ====
+## 1. Near Zero Vars
+nzv <- nearZeroVar(dat, saveMetrics = T)
+nzv %>% filter(nzv == T) # only IUCN, but this is an important predictor (!) we will keep it.
+
+# With recipe:
+# 1. Original recipe: imputation & correlation
+pp_recipe1 <- recipe(Jaccard ~ .,
+  data = dat
+) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_corr(all_numeric_predictors())
+
+
+# 2. Let's try with combined correlated predictors (pca)
+pp_recipe2 <- recipe(Jaccard ~ .,
+  data = dat
+) %>%
+  step_impute_knn(all_predictors()) %>%
+  step_normalize(all_of(cor_vars)) %>%
+  step_pca(all_of(cor_vars), threshold = .95) %>%
+  step_corr(all_numeric_predictors())
+
+# estimate recipe:
+pp_recipe_prepped1 <- prep(pp_recipe1, dat)
+pp_recipe_prepped1
+
+pp_recipe_prepped2 <- prep(pp_recipe2, dat)
+pp_recipe_prepped2
+
+# apply the recipe to the full dataset
+dat_v2 <- bake(pp_recipe_prepped1, dat)
+dat_v3 <- bake(pp_recipe_prepped2, dat)
+
+# remove old objects
+rm(dat, nzv, pp_recipe1, pp_recipe2, pp_recipe_prepped1, pp_recipe_prepped2)
+```
+
+#### Visualize data again
+
+Since we imputed and removed some data, let's have a look at it again.
+
+```{r, visualization-processed, fig.height = 10, fig.width= 12}
+## Species predictors
+dat_v2 %>%
+  select(-starts_with("atlas"), -starts_with("Atlas"), dataset) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black", alpha = 0.7) +
+  facet_wrap(~variable, scales = "free_x") +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Histograms of All Species Columns",
+    x = "Value",
+    y = "Frequency"
+  )
+
+## Atlas predictors
+dat_v2 %>%
+  select(dataset, starts_with("atlas"), starts_with("Atlas")) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black", alpha = 0.7) +
+  facet_wrap(~variable, scales = "free_x") +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Histograms of All Species Columns",
+    x = "Value",
+    y = "Frequency"
+  )
+
+## Atlas predictors
+dat_v3 %>%
+  select(-starts_with("atlas"), -starts_with("Atlas")) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black", alpha = 0.7) +
+  facet_wrap(~variable, scales = "free_x") +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw() +
+  labs(
+    title = "Histograms of All Species Columns",
+    x = "Value",
+    y = "Frequency"
+  )
+
+# Principle component axis 1 of correlated features
+dat_v3 %>%
+  select(PC1, dataset) %>%
+  melt() %>%
+  ggplot(aes(x = value, fill = dataset)) +
+  geom_histogram(bins = 30, color = "black", alpha = 0.7) +
+  facet_wrap(~variable, scales = "free_x") +
+  labs(
+    title = "Histograms of PC1 (correlated variables)",
+    x = "Value",
+    y = "Frequency"
+  ) +
+  scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+  theme_bw()
+```
+
+### Train & Test split
+
+We will start with an initial test/train split for evaluation of the final model. We will create 10 samples but for now only use one of them for faster fitting and evaluation of initial parameters. The others will be used during feature selection and final modeling.
+
+```{r, Jacc-initial-train-test-split}
+# Create 1 training (80%) and testing (20%) set
+set.seed(42)
+trainIndex0 <- createDataPartition(dat_v2$Jaccard, p = 0.8, 1) # 1 resamples
+trainIndex1 <- createDataPartition(dat_v3$Jaccard, p = 0.8, 1) # 1 resamples
+
+
+# Initial split
+trainData1 <- dat_v2[trainIndex0[[1]], ] # first resample
+testData1 <- dat_v2[-trainIndex0[[1]], ] # first resample
+
+
+trainData2 <- dat_v3[trainIndex0[[1]], ] # first resample
+testData2 <- dat_v3[-trainIndex0[[1]], ] # first resample
+
+# Create 10 training (80%) and testing (20%) sets
+set.seed(42)
+trainIndex1_ss <- createDataPartition(trainData1$Jaccard, list = TRUE, p = 0.8, 10) # 10 resamples
+set.seed(42)
+trainIndex2_ss <- createDataPartition(trainData2$Jaccard, list = TRUE, p = 0.8, 10) # 10 resamples
+```
+
+## Full model - single data split:
+
+I ran a first full model as baseline for the tuning steps. The data was randomly split once into train and test with a 0.8 proportion.
+
+***Grid search:***
+
+To yield the optimal hyperparameters for tuning the model, an extensive grid search was run across different combinations of *mtry* and *splitrule*. *Min.node.size* was held constant = 5 for all models. For *mtry*, the grid search was set up to try out every number of predictors from one to maximum number of predictors.
+
+***Internal validation:***
+
+I used 10-fold cross-validation with 5 repeats for model fitting across the grid search.
+
+[Note]{.underline}: the splitrule "extratrees" uses random subsampling of the data *and* random splitting thresholds (not based on response). Thus, the previously designed subsampling indices do not work for this method and some randomness is introduced into the model results which cannot be further controlled. 'Extratrees' is a useful method to produce more robust results if there is quite some noise in the data, which is definitely the case for our data.
+
+```{r, Jacc-full-model0-single-split, eval = FALSE}
+
+
+## General Model Setup ========================================
+
+# Count predictors:
+max_pred <- model.matrix(
+  ~ 0 + ., 
+  data = trainData1 %>% select(-Jaccard)) %>%
+  ncol()
+
+max_pred <- as.integer(max_pred / 2)
+max_pred # 21
+
+
+# Set Hyperparameter tuning:
+tunedGrid <- expand.grid(
+  mtry = seq(from = 1, to = max_pred, by = 2),
+  splitrule = c("variance", "extratrees"),
+  min.node.size = c(3, 5, 10))
+
+# Set Cross-Validation:
+trainedControl <- trainControl(
+  method = "repeatedcv",
+  number = 10, # 10 splits
+  repeats = 5, # 3 repeats
+  savePredictions = T,
+  returnResamp = "all",
+  index = trainIndex1_ss, # 10 resamples
+  verboseIter = TRUE)
+
+
+
+# Train the random forest model =================================
+tictoc::tic()
+set.seed(42)
+model_rf0 <- train(
+  Jaccard ~ .,
+  data = trainData1, # single split trainData
+  # random forest model from ranger package
+  method = "ranger",
+  # Cross-validation & tuning
+  trControl = trainedControl,
+  tuneGrid = tunedGrid,
+  # tuneLength = 20,
+  respect.unordered.factors = TRUE,
+  # Number of trees to grow
+  num.trees = 5000,
+  # local variable importance
+  importance = "permutation",
+  local.importance = T,
+  oob.error = T,
+  verbose = FALSE
+)
+tictoc::toc()
+
+saveRDS(model_rf0, "model_rf0.rds")
+
+# Time tracker:
+## 10 resamples, 10-fold 5x repeated CV, tunelength = 20, 5000 trees  ~
+
+```
+
+## Model performance
+
+```{r, model0-performance}
+model_rf0 <- readRDS("model_rf0.rds")
+
+# Model performance plot
+plot(model_rf0)
+
+# Let's save the most important model results to a list object ====================================
+
+# Final Model details:
+model_rf0$finalModel
+model_rf0$finalModel[21]$tuneValue
+
+# Model performance across resamples:
+postResample(pred = model_rf0$pred$pred, obs = model_rf0$pred$obs)
+
+# Model performance from final model with OOB-predictions:
+postResample(pred = predict(model_rf0, newdata = testData), obs = testData$Jaccard)
+
+# Variable importance:
+varImp(model_rf0)
+
+
+# Predictions:
+predictions <- predict(model_rf0, newdata = testData)
+dd <- data.frame(testData$Jaccard, testData$dataset, predictions)
+
+# In-bag Error:
+postResample(
+  pred = predict(model_rf0, newdata = trainData),
+  obs = trainData$Jaccard) 
+
+# Out-of-bag Error:
+model_rf0$finalModel[13] 
+
+# Test error:
+postResample(pred = predictions, obs = testData$Jaccard)
+
+
+
+# Save Model results to list object =====
+p_full_model <- list(
+  Plots = list(
+    # Check Model hyperparameter performance:
+    pR2 = ggplot(model_rf0, metric = "RMSE") +  
+      theme_bw(),
+    pRMSE = ggplot(model_rf0, metric = "Rsquared") +  
+      theme_bw(),
+    # Variable importance:
+    pVarImp = ggplot(varImp(model_rf0)) +
+      theme_bw(),
+    # Predictions by dataset
+    pPred1 = xyplot(dd$predictions ~ dd$testData.Jaccard,
+                    groups = dd$testData.dataset,#
+                    type = c("g", "p", "smooth"),
+                    ylim = c(-1, 2)),
+    pPred2 =  dd %>%
+      ggplot(aes(x = testData.Jaccard, y = predictions)) +
+      geom_point(shape = "circle", size = 1.5) +
+      geom_smooth(method = "gam") +
+      ylim(-1, 2) +
+      theme_bw()),
+  Res = list(
+    # Model object
+    Full_model = model_rf0,
+    # Final model
+    Final_model = model_rf0$finalModel,
+    # Final Hyperparameters:
+    TuneVals = model_rf0$finalModel[21]$tuneValue,
+    # Prediction on test data
+    TestPred = dd,
+    PredErr = model_rf0$finalModel$prediction.error,
+    # In-bag errors
+    In_bag_err1 = postResample(pred = model_rf0$pred$pred, obs = model_rf0$pred$obs),
+    In_bag_err2 = postResample(pred = predict(model_rf0, newdata = trainData), obs = trainData$Jaccard),
+    # Out-of-Bag error:
+    OOB_err = model_rf0$finalModel[13]$r.squared,
+    # Test error:
+    Test_err = postResample(pred = predictions, obs = testData$Jaccard)
+  )
+)
+
+
+# Save workspace as this takes a while to run...
+save.image("Assignment_ws_rfFuncs.RData")
+```
+
+### Model evaluation: full model
+
+The final model was selected with the following hyper-parameters, as this combination yielded the lowest OOB-RMSE:
+
+-   
+
+```{r, full-model-eval, fig.height = 18, fig.width = 16}
+load("Assignment_ws_rfFuncs.RData")
+library(gridExtra)
+
+layout_matrix <- rbind(
+  c(1, 2),
+  c(3, 4),
+  c(3, 5)
+)
+
+# Arrange the plots
+grid.arrange(
+  grobs = p_full_model$Plots,
+  layout_matrix = layout_matrix,
+  padding = 1
+)
+```
+
+# Recursive Feature Selection
+
+We will compare the results for two ***modeling approaches***:
+
+1.  run the model for the full data (i.e., without any hold-back samples for validation) - `y_nosplit, x_nosplit`
+2.  run the model for the initially split data (i.e., with `testData1` as hold-back sample) - `y_split, x_split`
+
+For both approaches we will use 10x resampling of the internal test/train splits to get robust results (index).
+
+***Validation settings:***
+
+-   3x repeated 10-fold cross-validation
+
+***Recursive Feature Selection settings:***
+
+-   try `subset = 1:81` predictors to select features for the final model.
+
+-   We will run this across all 10 resamples of the training/testing splits
+
+```{r, Jacc-recursive-feature-selection, eval = F}
+tictoc::tic()
+# rm(llist = ls())
+# library(caret)
+# library(dplyr)
+# load("Assignment_ws_rfFuncs.RData")
+
+# set plot theme:
+trellis.par.set(caretTheme())
+
+# Initally split data (1 resample)
+# trainData1
+# testData1
+
+trainIndices <- list(trainIndex0, trainIndex1, trainIndex1b, trainIndex2b)
+# 4.1 Feature Selection (full data)
+y_nosplit1 <- dat_v2 %>%
+  na.omit() %>%
+  pull(Jaccard)
+x_nosplit1 <- dat_v2 %>%
+  na.omit() %>%
+  select(-Jaccard)
+
+y_nosplit2 <- dat_v3 %>%
+  na.omit() %>%
+  pull(Jaccard)
+x_nosplit2 <- dat_v3 %>%
+  na.omit() %>%
+  select(-Jaccard)
+
+# 4.2 Feature selection (single split data) - so that we can compare training to testing data
+y_split1 <- trainData1 %>%
+  na.omit() %>%
+  pull(Jaccard)
+x_split1 <- trainData1 %>%
+  na.omit() %>%
+  select(-Jaccard)
+
+y_split2 <- trainData2 %>%
+  na.omit() %>%
+  pull(Jaccard)
+x_split2 <- trainData2 %>%
+  na.omit() %>%
+  select(-Jaccard)
+
+# Lists with data to loop through (full data, split data)
+y_l <- list(y_nosplit1, y_split1,y_nosplit2, y_split2 )
+x_l <- list(x_nosplit1, x_split1,x_nosplit2, x_split2)
+
+# Control for recursive feature selection
+set.seed(42)
+ctrl <- rfeControl(
+  functions = rfFuncs,
+  saveDetails = TRUE,
+  returnResamp = "all",
+  method = "repeatedcv",
+  number = 10, # 10-fold CV
+  repeats = 3, # 3 repeats
+  verbose = FALSE,
+  index = trainIndices[[1]]
+)
+
+ctrl2 <- rfeControl(
+  functions = rfFuncs,
+  saveDetails = TRUE,
+  returnResamp = "all",
+  method = "repeatedcv",
+  number = 10, # 10-fold CV
+  repeats = 3, # 3 repeats
+  verbose = FALSE,
+  index = trainIndices[[2]]
+)
+
+ctrl3 <- rfeControl(
+  functions = rfFuncs,
+  saveDetails = TRUE,
+  returnResamp = "all",
+  method = "repeatedcv",
+  number = 10, # 10-fold CV
+  repeats = 3, # 3 repeats
+  verbose = FALSE,
+  index = trainIndices[[1]]
+)
+
+ctrl <- rfeControl(
+  functions = rfFuncs,
+  saveDetails = TRUE,
+  returnResamp = "all",
+  method = "repeatedcv",
+  number = 10, # 10-fold CV
+  repeats = 3, # 3 repeats
+  verbose = FALSE,
+  index = trainIndices[[1]]
+)
+
+ctrls <- list(ctrl, ctrl2)
+# Subsets of predictors to use for recursive feature selection
+max_pred <- glmnet::makeX(trainData) %>% ncol() # get number of max. predictors (with dummy vars)
+subsets <- c(1:max_pred) # 1: max number of predictive variables (incl. dummy vars)
+out_list <- vector("list", length = 4)
+
+# Loop through both splitting-approaches =====
+for (i in seq_along(1:4)) {
+  # Recursive Features selection
+  set.seed(42)
+  rfProfile <- rfe(x_l[[i]], y_l[[i]],
+    sizes = subsets,
+    rfeControl = ctrls[[i]]
+  )
+
+  # Write models to file
+  saveRDS(rfProfile, paste0("rfProfile_", i, ".rds"))
+
+  # Save the Results
+  out_list[[i]] <- list(
+    Res = list(
+      object = rfProfile,
+      predictors = predictors(rfProfile),
+      variables = rfProfile$variables,
+      topVars = rfProfile$variables %>%
+        group_by(var) %>%
+        summarise(Mean_resamp = mean(Overall)) %>%
+        arrange(desc(Mean_resamp), decreasing = T),
+      results = rfProfile$results
+    ),
+    Plots = list(
+      plot1 = plot(rfProfile, type = c("g", "o")),
+      plot2 = xyplot(rfProfile$results$Rsquared + rfProfile$results$RMSE ~ rfProfile$results$Variables, type = c("g", "p", "l")),
+      plot3 = xyplot(rfProfile, type = c("g", "p", "smooth"), ylab = "RMSE CV Estimates"),
+      plot4 = densityplot(rfProfile, subset = Variables < 5, adjust = 1.25, as.table = TRUE, xlab = "RMSE CV Estimates", pch = "|")
+    )
+  )
+}
+
+# Save results to file
+saveRDS(out_list, "out_list_FeatureSelection.rds")
+save.image("Assignment_ws_rfFuncs_2.RData")
+tictoc::toc() # 2153.62 sec elapsed
+```
+
+```{r, recursive-feature-selection, eval = F}
+tictoc::tic()
+# rm(llist = ls())
+# library(caret)
+# library(dplyr)
+# load("Assignment_ws_rfFuncs.RData")
+
+# set plot theme:
+trellis.par.set(caretTheme())
+
+# Initally split data (1 resample)
+# trainData1
+# testData1
+
+trainIndices <- list(trainIndex0, trainIndex)
+# 4.1 Feature Selection (full data)
+y_nosplit <- dat_v2 %>%
+  na.omit() %>%
+  pull(Jaccard)
+x_nosplit <- dat_v2 %>%
+  na.omit() %>%
+  select(-Jaccard)
+
+# 4.2 Feature selection (single split data) - so that we can compare training to testing data
+y_split <- trainData %>%
+  na.omit() %>%
+  pull(Jaccard)
+x_split <- trainData %>%
+  na.omit() %>%
+  select(-Jaccard)
+
+# Lists with data to loop through (full data, split data)
+y_l <- list(y_nosplit, y_split)
+x_l <- list(x_nosplit, x_split)
+
+# Control for recursive feature selection
+set.seed(42)
+ctrl <- rfeControl(
+  functions = rfFuncs,
+  saveDetails = TRUE,
+  returnResamp = "all",
+  method = "repeatedcv",
+  number = 10, # 10-fold CV
+  repeats = 3, # 3 repeats
+  verbose = FALSE,
+  index = trainIndices[[1]]
+)
+
+ctrl2 <- rfeControl(
+  functions = rfFuncs,
+  saveDetails = TRUE,
+  returnResamp = "all",
+  method = "repeatedcv",
+  number = 10, # 10-fold CV
+  repeats = 3, # 3 repeats
+  verbose = FALSE,
+  index = trainIndices[[2]]
+)
+
+ctrls <- list(ctrl, ctrl2)
+# Subsets of predictors to use for recursive feature selection
+max_pred <- glmnet::makeX(trainData) %>% ncol() # get number of max. predictors (with dummy vars)
+subsets <- c(1:max_pred) # 1: max number of predictive variables (incl. dummy vars)
+out_list <- vector("list", length = 2)
+
+# Loop through both splitting-approaches =====
+for (i in seq_along(1:2)) {
+  # Recursive Features selection
+  rfProfile <- rfe(x_l[[i]], y_l[[i]],
+    sizes = subsets,
+    rfeControl = ctrls[[i]]
+  )
+
+  # Write models to file
+  saveRDS(rfProfile, paste0("rfProfile_", i, ".rds"))
+
+  # Save the Results
+  out_list[[i]] <- list(
+    Res = list(
+      object = rfProfile,
+      predictors = predictors(rfProfile),
+      variables = rfProfile$variables,
+      topVars = rfProfile$variables %>%
+        group_by(var) %>%
+        summarise(Mean_resamp = mean(Overall)) %>%
+        arrange(desc(Mean_resamp), decreasing = T),
+      results = rfProfile$results
+    ),
+    Plots = list(
+      plot1 = plot(rfProfile, type = c("g", "o")),
+      plot2 = xyplot(rfProfile$results$Rsquared + rfProfile$results$RMSE ~ rfProfile$results$Variables, type = c("g", "p", "l")),
+      plot3 = xyplot(rfProfile, type = c("g", "p", "smooth"), ylab = "RMSE CV Estimates"),
+      plot4 = densityplot(rfProfile, subset = Variables < 5, adjust = 1.25, as.table = TRUE, xlab = "RMSE CV Estimates", pch = "|")
+    )
+  )
+}
+
+# Save results to file
+saveRDS(out_list, "out_list_FeatureSelection.rds")
+save.image("Assignment_ws_rfFuncs_2.RData")
+tictoc::toc() # 2153.62 sec elapsed
+```
+
+## Variable Importance & Feature selection
+
+```{r}
+tictoc::tic()
+
+# read workspace back in
+load("Assignment_ws_rfFuncs_2.RData")
+
+gridExtra::grid.arrange(
+  ggplot(out_list[[1]]$Res$object) +
+    theme_bw(),
+  ggplot(out_list[[2]]$Res$object) +
+    theme_bw()
+)
+
+# step 4. check performance over split / resamples, respectively, with held-back samples
+## Resamples:
+print(out_list[[2]]$Plots$plot3, split = c(1, 1, 1, 2), more = TRUE)
+print(out_list[[2]]$Plots$plot4, split = c(1, 2, 1, 2))
+
+## Full Data:
+print(out_list[[1]]$Plots$plot3, split = c(1, 1, 1, 2), more = TRUE)
+print(out_list[[1]]$Plots$plot4, split = c(1, 2, 1, 2))
+
+
+### OOB Error:
+# OOB_err <-   out_list[[1]]$object$rf$finalModel[13] # OOB R2
+### Test error:
+# Test_err <- postResample(pred = predictions, obs = testData1$Jaccard)
+
+
+# step 5. determine best number of predictors
+## Top variables from full model and final model with resampling
+top_vars_full <- out_list[[1]]$Res$topVars$var # 43 vars
+keep <- c(out_list[[2]]$Res$object$optVariables) # 38 vars
+
+# Importance for the full data
+imp_full <- out_list[[1]]$Res$topVars
+names(imp_full) <- c("full_data", "full_data_imp")
+
+# Importance averaged across resamples
+imp_resamp <- out_list[[2]]$Res$topVars
+names(imp_resamp) <- c("resamps", "resamp_mean_imp")
+
+# save both with ranking to data frame
+top_vars <- data.frame(
+  rank = seq(1:38),
+  full_data = top_vars_full,
+  resamps = imp_resamp$resamps
+)
+
+# step 6. estimate final list of predictors to keep in final model
+# Add indicator column of which variables to keep for the model
+top_vars <- top_vars %>%
+  left_join(imp_full) %>%
+  full_join(imp_resamp) %>%
+  mutate(
+    keep_resamp =
+      case_when(resamps %in% keep ~ 1,
+        .default = 0
+      )
+  )
+
+
+print(top_vars)
+
+# Write the predictor importance list to file:
+# write.csv(top_vars, "../../../out/csv/Top_vars_resamp_summary.csv")
+
+tictoc::toc()
+```
+
+# Final model (38 predictors)
+
+```{r}
+tictoc::tic()
+# step 7. fit the final model with the optimal S using the original training set
+# Preprocess the data
+dat_v3 <- dat_v2 %>%
+  na.omit() %>%
+  select(Jaccard, all_of(keep))
+
+## Loop through 5 resamples of training&testing splits:
+# Create training (80%) and testing (20%) sets
+set.seed(42)
+train_index <- createDataPartition(
+  dat_v3$Jaccard,
+  p = 0.8,
+  list = TRUE,
+  times = 10
+)
+
+## 10-fold cross-validation with 3 repeats:
+# Define training control
+train_control <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3,
+  savePredictions = "all",
+  index = train_index # For 5 resamples of data splitting
+)
+
+
+# Define the model (with extensive automatized grid search via tuneLength = 10)
+set.seed(42)
+model <- train(
+  Jaccard ~ .,
+  data = dat_v3,
+  metric = "RMSE",
+  trControl = train_control,
+  method = "ranger",
+  importance = "permutation",
+  local.importance = TRUE,
+  scale.permutation.importance = TRUE,
+  oob.error = TRUE,
+  respect.unordered.factors = TRUE,
+  num.trees = 1000,
+  tuneLength = 10
+)
+
+# Evaluate model hyperparameter search and model performance
+plot(model, metric = "Rsquared")
+
+# Final model:
+model$finalModel
+
+postResample(pred = dat_v3$Jaccard, obs = model$finalModel$predictions)
+tictoc::toc()
+```
+
+```{r}
+sessionInfo()
+Packages_citation <- lapply(sessionInfo()$otherPkgs %>% names(), citation)
+print(Packages_citation)
+```
+
+# Recipes
+
+## Data Prep
+
+```{r}
+rm(list = ls())
+
+library(caret)
+library(dplyr)
+```
