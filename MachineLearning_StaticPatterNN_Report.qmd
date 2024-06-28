@@ -313,11 +313,183 @@ dat_v2 <- bake(recipe_pp_prepped, dat)
 
 ```{r}
 set.seed(42)
-indices <- createDataPartition(dat_v2$Jaccard, p = 0.8, 10) # 10 resamples
+index <- createDataPartition(dat_v2$Jaccard, p = 0.8, 1, list = FALSE)
+
+dat_train <- dat_v2[index,]
+dat_test <- dat_v2[-index,]
+
+indices <- createDataPartition(dat_train$Jaccard, p = 0.8, 5) # 10 resamples
+```
+
+
+### Predictor importance
+```{r}
+## Summary function for randomForest
+rfRFE <-  list(summary1 = defaultSummary,
+               fit = function(x, y, first, last, ...){
+                 library(randomForest)
+                 randomForest(x, y, importance = first, ...)
+                 },
+               pred = function(object, x)  predict(object, x),
+               rank = function(object, x, y) {
+                 vimp <- varImp(object)
+                 vimp <- vimp[order(vimp$Overall,decreasing = TRUE),,drop = FALSE]
+                 vimp$var <- rownames(vimp)                  
+                 vimp
+                 },
+               summary2 = defaultSummary,
+               fit = function(x, y, first, last, ...){
+                 library(ranger)
+                 ranger(dependent.variable.name = y, data = data.frame(x, y), importance = 'impurity', ...)
+                 },
+               pred = function(object, x)  predict(object, data.frame(x))$predictions,
+               rank = function(object, x, y) {
+                 vimp <- importance(object)
+                 vimp <- data.frame(Overall = vimp)
+                 vimp$var <- rownames(vimp)
+                 vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
+                 vimp
+                 },
+               selectSize = pickSizeBest,
+               selectVar = pickVars)
+
+set.seed(42)
+ctrl <- rfeControl(functions = rfFuncs,
+                   method = "repeatedcv",
+                   number = 10,
+                   repeats = 3,
+                   returnResamp = "all", # we need all resamples
+                   verbose = FALSE)
+
+
+set.seed(42)
+subsets <- c(1:5, 10, 15, 20, 25, 30, 35, 40, 45, 60)
+
+x <- dat_train %>% select(-Jaccard)
+y <- dat_train %>% pull(Jaccard)
+rfProfile <- rfe(x, y, sizes = subsets, rfeControl = ctrl)
+rfProfile
+plot(rfProfile)
+rfProfile$fit$importance
+```
+
+### Individual models
+
+```{r}
+# Define training control
+trainControl <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3,
+  savePredictions = "final",
+  verboseIter = TRUE
+)
+
+# Train ranger model
+set.seed(42)
+rangerModel <- train(
+  Jaccard ~ .,
+  data = dat_train,
+  method = "ranger",
+  trControl = trainControl,
+  importance ="permutation",
+  respect.unordered.factors = TRUE
+)
+varImp(rangerModel)
+plot(rangerModel)
+
+# Train xgbTree model
+set.seed(42)
+xgbModel <- train(
+  Jaccard ~ .,
+  data = dat_train,
+  method = "xgbTree",
+  trControl = trainControl
+)
+varImp(xgbModel)
+
+# Train gbm model
+set.seed(123)
+gbmModel <- train(
+  Jaccard ~ .,
+  data = dat_train,
+  method = "gbm",
+  trControl = trainControl,
+  verbose = FALSE
+)
+summary.gbm(gbmModel)
+
+# Compare models using resamples
+resamples <- resamples(list(
+  ranger = rangerModel,
+  xgbTree = xgbModel,
+  gbm = gbmModel
+))
+
+summary(resamples)
+xyplot(resamples)
+
+# Plot comparison
+bwplot(resamples)
+```
+
+### Ensemble model
+
+Now we will compare randomForest to boosed regression trees or extreme gradient boosting.
+```{r}
+pckgs2 <- c("caret", "caretEnsemble", "gbm", "xgboost")
+install_and_load(pckgs2)
+
+set.seed(42)
+trained_control <- trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 3,
+  savePredictions = "final",
+  returnResamp = "final",
+  verboseIter = TRUE,
+  index = indices
+)
+
+modelsList <- caretList(
+  Jaccard ~ .,
+  data = dat_train,
+  trControl = trained_control,
+  methodList = c("gbm", "xgbTree", "ranger")
+)
+
+p <- as.data.frame(predict(modelsList, newdata=dat_train)) %>% cbind(dat_train$Jaccard)
+
+p
+xyplot(resamples(modelsList))
+# Create the ensemble model
+ensembleModel <- caretEnsemble(
+  modelsList,
+  metric = "Rsquared",
+  trControl = trained_control
+)
+
+
+greedy_ensemble <- caretEnsemble(
+  modelsList,
+  metric="Rsquared",
+  trControl=trainControl(
+    number=2,
+    summaryFunction=defaultSummary
+    ))
+summary(greedy_ensemble)
+
+varImp(modelsList)
+
+
+varImp(modelsList[[1]])
+varImp(modelsList[[2]])
+varImp(modelsList[[3]])
 
 ```
 
 ### Train Neural Network
+
 We will train 10 sets of neural networks (one for each resample of the data splitting)
 
 ```{r}
@@ -331,18 +503,19 @@ for (resamp in seq_along(indices)){
   
   nn_fit <- dnn(Jaccard ~ ., 
                        data = train_df %>% select(Jaccard, AOO, D_AOO_a, IUCN),
-                       #validation = 0.2,
-                       hidden = c(50L, 50L),
+                       validation = 0.2,
+                       hidden = c(50L, 50L, 50L, 50L),
                        activation = "relu",
                        loss = "mse",
-                       #lr = 0.0001,
-                       #epochs = 6000L,
-                       #lr_scheduler = config_lr_scheduler("reduce_on_plateau", patience = 10, factor = 0.5),
+                       lr = 0.0001,
+                       epochs = 6000L,
+                       lr_scheduler = config_lr_scheduler("reduce_on_plateau", patience = 10, factor = 0.5),
                        plot = TRUE,
                        tuning = config_optimizer("adam"),
                        verbose = TRUE,
-                       bootstrap = 100)
+                       bootstrap = 1000)
 
+  
 analyze_training(nn_fit)
 
 predictions <- predict(nn_fit, test_df)
