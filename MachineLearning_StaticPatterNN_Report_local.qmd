@@ -131,7 +131,7 @@ change signal in the occupancy data.
 rm(list = ls())
 source("src/functions.R")
 
-pckgs <- c("dplyr", "ggplot2", "reshape2", "caret", "ggcorrplot", "recipes", "cito", "plotly", "igraph", "ggraph", "caretEnsemble", "randomForest", "ranger", "gbm", "xgboost")
+pckgs <- c("dplyr", "ggplot2", "reshape2", "caret", "ggcorrplot", "recipes", "cito", "plotly", "igraph", "ggraph", "caretEnsemble", "randomForest", "ranger")
 install_and_load(pckgs)
 
 # Neural Networks requirements:
@@ -432,68 +432,7 @@ indices <- createDataPartition(dat_train$Jaccard, p = 0.8, 10) # 10 resamples
 ### Predictor importance / Recursive Feature Selection
 
 ```{r}
-#| eval = FALSE
-
-## Default summary function (rfFuncs)
-rfFuncs <- list(
-    summary = 
-    function (data, lev = NULL, model = NULL) {
-    if (is.character(data$obs)) 
-        data$obs <- factor(data$obs, levels = lev)
-    postResample(data[, "pred"], data[, "obs"])
-    },
-    
-    fit = 
-    function (x, y, first, last, ...) {
-    loadNamespace("randomForest")
-    randomForest::randomForest(x, y, importance = TRUE, ...)
-    },
-    
-    pred = 
-    function (object, x) {
-    tmp <- predict(object, x)
-    if (is.factor(object$y)) {
-        out <- cbind(data.frame(pred = tmp), as.data.frame(predict(object, 
-            x, type = "prob"), stringsAsFactors = TRUE))}
-    else out <- tmp
-    out
-    },
-    
-    rank = 
-    function (object, x, y) {
-        vimp <- varImp(object)
-        if (is.factor(y)) {
-            if (all(levels(y) %in% colnames(vimp))) {
-                avImp <- apply(vimp[, levels(y), drop = TRUE], 1, mean)
-                vimp$Overall <- avImp}
-                }
-        vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
-        if (ncol(x) == 1) {
-            vimp$var <- colnames(x)}
-        else vimp$var <- rownames(vimp)
-        vimp
-    },
-
-    selectSize = 
-    function (x, metric, maximize) {
-        best <- if (maximize) 
-        which.max(x[, metric])
-        else which.min(x[, metric])
-        min(x[best, "Variables"])
-    },
-
-    selectVar = 
-    function (y, size) {
-        finalImp <- ddply(y[, c("Overall", "var")], .(var), function(x) mean(x$Overall, 
-        na.rm = TRUE))
-        names(finalImp)[2] <- "Overall"
-        finalImp <- finalImp[order(finalImp$Overall, decreasing = TRUE), ]
-        as.character(finalImp$var[1:size])
-    }
-)
-
-
-## Custom summary function for randomForest (simplified)
+## Summary function for randomForest
 rfRFE1 <- list(
     summary = defaultSummary,
     fit = function(x, y, first, last, ...) {
@@ -613,79 +552,9 @@ saved_profiles[[i]] <- list(rfProfile, rfProfile2)
 
 tictoc::toc()
 
-save.image("data/rfe.RData")
-```
-
-```{r}
-
-load("data/rfe.RData")
-
-results <- replicate(10, list())
-for(i in seq_along(1:length(saved_profiles))){
-    for (y in seq_along(1:length(saved_profiles[[i]]))){
-        resamp_res <- saved_profiles[[i]][[y]]
-        res <- slice_min(resamp_res$results, RMSE)
-        results[[i]][[y]] <- res
-        
-    }
-}
-
-rfe_res <- do.call(rbind, unlist(results, recursive = FALSE))
-rfe_res$model <- rep(c("default", "simple"), 10)
-ggplot(data = rfe_res, aes(x = model, y = Variables)) +
-    geom_boxplot() +
-    geom_point(data = rfe_res %>% group_by(model) %>% summarize(mean_Variables = mean(Variables)), 
-    aes(x = model, y = mean_Variables), color = "red") +
-    theme_bw()
-
-rfe_res %>% group_by(model) %>% summarize(mean_Variables = mean(Variables)) # 25.4 for both
-rfe_res %>% group_by(model) %>% summarize(median_Variables = median(Variables)) # 26 for default, 24 for simple. Let's go with the results for the default model: 26.
-
-saved_res2 <- unlist(saved_profiles, recursive = FALSE)
-saved_res3 <- saved_res2[c(seq(from = 1, to = 20, by = 2))] # keep only default models
-
-res_top_vars <- list()
-for(i in seq_along(saved_res3)){
-
-res_top_vars[[i]] <- data.frame(
-    var = row.names(varImp(saved_res3[[i]], scale = T)),
-    Imp = varImp(saved_res3[[i]])$Overall,
-    include = c(rep_len(1, as.numeric(saved_res3[[i]]$bestSubset)), 
-                rep_len(0,  
-                length(row.names(varImp(saved_res3[[i]], scale = T)))-as.numeric(saved_res3[[i]]$bestSubset))
-            ),
-    model = i
-        )
-}
-
-res_top_vars_df <- do.call(rbind, res_top_vars)
-
-
-### Plot with variable importances across 10 rfe runs ======
-ggplot(data = res_top_vars_df %>% filter(include == 1), 
-        aes(y = reorder(var, Imp), x = Imp))+
-    geom_boxplot()+
-    theme_bw()
-
-res_top_vars_df %>% filter(include == 1) %>% arrange(desc(Imp)) %>% distinct(var)
-
-
-## How often was each variable chosen to be included?
-
-ggplot(data = res_top_vars_df, aes(fill= as.factor(include), y = reorder(var, Imp))) +
-    geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 10.5), fill = "lightgray", alpha = 0.9) +
-    geom_bar() +
-    theme_bw() +
-    geom_hline(yintercept = 10.5) +
-    scale_fill_manual(values = c("#D55E00","#009E73")) +
-    theme(legend.position = "right") +
-    labs(title = "Top Variables by Importance", x = "Importance", y = "Variable")
-
 ```
 
 ### Individual models
-
-#### Hyperparameter tuning
 
 ```{r}
 # Define training control
@@ -694,9 +563,7 @@ trainControl <- trainControl(
     number = 10,
     repeats = 3,
     savePredictions = "final",
-    returnResamp = "all",
-    verboseIter = TRUE,
-    index = indices
+    verboseIter = TRUE
 )
 
 # Train ranger model
@@ -707,211 +574,33 @@ rangerModel <- train(
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
-    num.trees = 5000,
-    respect.unordered.factors = TRUE,
-    oob.error = TRUE,
-    tuneLength = 20
+    respect.unordered.factors = TRUE
 )
-
+varImp(rangerModel)
 plot(rangerModel)
-rangerModel$finalModel
-
-
 
 # Train xgbTree model
-## takes ~ 15 min per resample
 set.seed(42)
 xgbModel <- train(
     Jaccard ~ .,
     data = dat_train,
     method = "xgbTree",
-    trControl = trainControl,
-    tuneLength = 20)
-plot(xgbModel)
-slice_min(xgbModel$results, RMSE)
-slice_max(xgbModel$results, Rsquared)
-
-
-
+    trControl = trainControl
+)
+varImp(xgbModel)
 
 # Train gbm model
-set.seed(42)
-gbmModel <- train(
-    Jaccard ~ .,
-    data = dat_train,
-    method = "gbm",
-    trControl = trainControl,
-    tuneLength= 20,
-    verbose = FALSE
-)
-summary.gbm(gbmModel$finalModel)
-plot(gbmModel)
-gbmModel$finalModel
-slice_min(gbmModel$results, RMSE)
-slice_max(gbmModel$results, Rsquared)
-
-```
-
-#### Final models
-
-```{r}
-trainControl <- trainControl(
-    method = "repeatedcv",
-    number = 10,
-    repeats = 3,
-    savePredictions = "final",
-    returnResamp = "final",
-    verboseIter = TRUE,
-    index = indices
-)
-
-# Train ranger model
-ranger_grid <- expand.grid(
-    splitrule = "variance",
-    mtry = 29,
-    min.node.size = 5
-)
-
-set.seed(42)
-rangerModel <- train(
-    Jaccard ~ .,
-    data = dat_train,
-    method = "ranger",
-    trControl = trainControl,
-    importance = "permutation",
-    num.trees = 5000,
-    respect.unordered.factors = TRUE,
-    oob.error = TRUE,
-    tuneGrid = ranger_grid
-)
-
-# Performance checks ======
-## Check test performance with external data (from initial split)
-test_performance_rf <- data.frame(
-    prediction = predict(rangerModel, newdata = dat_test),
-    observed = dat_test$Jaccard) %>%
-    mutate(test_error = observed-prediction)
-
-round(mean(test_performance_rf$test_error), 4) 
-# mean test error = 0.0092 (mtry = 29) // 0.0099 (mtry = 57)
-
-
-ggplot(aes(observed, prediction), data = test_performance_rf)+
-    geom_point()+
-    geom_smooth(method = "lm")+
-    ylim(0,1)+
-    xlim(0,1)+
-    theme_bw()
-
-
-```
-
-```{r}
-## custom tuning for xgb:
-xgb_grid <- expand.grid(
-  nrounds = 150,
-  eta = 0.3,
-  max_depth = 2,
-  gamma = 0,
-  colsample_bytree = 0.6,
-  min_child_weight = 1,
-  subsample = 1
-)
-
-set.seed(42)
-xgbModel <- train(
-    Jaccard ~ .,
-    data = dat_train,
-    method = "xgbTree",
-    trControl = trainControl,
-    tuneGrid = xgb_grid)
-
-## Check test performance with external data (from initial split)
-test_performance_xgb <- data.frame(
-    prediction = predict(xgbModel, newdata = dat_test),
-    observed = dat_test$Jaccard) %>%
-    mutate(test_error = observed-prediction)
-
-round(mean(test_performance_xgb$test_error), 4) 
-# mean test error = 
-
-
-ggplot(aes(observed, prediction), data = test_performance_xgb)+
-    geom_point()+
-    geom_smooth(method = "lm")+
-    ylim(0,1)+
-    xlim(0,1)+
-    theme_bw()
-```
-
-
-```{r}
-# Train gbm model
-gbm_grid <-  expand.grid(interaction.depth = 15, 
-                        n.trees = 350, 
-                        shrinkage = 0.1,
-                        n.minobsinnode = 10)
-
 set.seed(123)
 gbmModel <- train(
     Jaccard ~ .,
     data = dat_train,
     method = "gbm",
     trControl = trainControl,
-    tuneGrid = gbm_grid,
     verbose = FALSE
 )
+summary.gbm(gbmModel)
 
-
-## Check test performance with external data (from initial split)
-test_performance_gbm <- data.frame(
-    prediction = predict(gbmModel, newdata = dat_test),
-    observed = dat_test$Jaccard) %>%
-    mutate(test_error = observed-prediction)
-
-round(mean(test_performance_gbm$test_error), 4) 
-# mean test error = 
-
-
-ggplot(aes(observed, prediction), data = test_performance_gbm)+
-    geom_point()+
-    geom_smooth(method = "lm")+
-    ylim(0,1)+
-    xlim(0,1)+
-    theme_bw()
-```
-
-### Compare models
-```{r}
-# Prediction error for test data ============
-test_error_all <- data.frame(
-    observed = dat_test$Jaccard,
-    pred_ranger = predict(rangerModel, newdata=dat_test),
-    pred_xgb = predict(xgbModel, newdata=dat_test),
-    pred_gbm = predict(gbmModel, newdata=dat_test)) %>%
-    mutate(
-        test_error_ranger = observed-pred_ranger,
-        test_error_xgb = observed-pred_xgb,
-        test_error_gbm = observed-pred_gbm)
-
-round(mean(test_error_all$test_error_ranger),4)
-round(mean(test_error_all$test_error_xgb),4)
-round(mean(test_error_all$test_error_gbm),4)
-print(test_error_all)
-
-# Variable importance ============
-imp_rf <- varImp(rangerModel, type=1)$importance %>% 
-    rename("Imp_ranger" = "Overall")
-imp_xgb <- varImp(xgbModel, type=1)$importance %>% 
-    rename("Imp_xgb" = "Overall")
-imp_gbm <- varImp(gbmModel, type=1)$importance %>% 
-    rename("Imp_gbm" = "Overall")
-
-imp_temp <- merge(imp_rf, imp_xgb, by = "row.names", all = TRUE)
-imp_all <- merge(imp_temp, imp_gbm, by.x = "Row.names", by.y = "row.names", all = TRUE) %>% mutate_if(is.numeric, round, 2) %>%
-arrange(desc(Imp_ranger))
-
-# Compare models using resamples ============
+# Compare models using resamples
 resamples <- resamples(list(
     ranger = rangerModel,
     xgbTree = xgbModel,
@@ -925,94 +614,13 @@ xyplot(resamples)
 bwplot(resamples)
 ```
 
-### Partial Dependence Plots
-
-```{r}
-
-## Partial dependence plots
-# Get all partial dependencies ==================
-pp_list_ranger <- replicate(39, list())
-for (var in seq_along(1:length(names(dat_train %>% select(-Jaccard))))){
-    pred_var <- names(dat_train %>% select(-Jaccard))[var]
-    pp_list_ranger[[var]] <- partial(
-        rangerModel, 
-        pred.var = pred_var, 
-        plot = FALSE)
-}
-
-
-
-pp_list_xgb <- replicate(39, list())
-for (var in seq_along(1:length(names(dat_train %>% select(-Jaccard))))){
-    pred_var <- names(dat_train %>% select(-Jaccard))[var]
-    pp_list_xgb[[var]] <- partial(
-        xgbModel, 
-        pred.var = pred_var, 
-        plot = FALSE)
-}
-
-
-
-
-pp_list_gbm <- replicate(39, list())
-for (var in seq_along(1:length(names(dat_train %>% select(-Jaccard))))){
-    pred_var <- names(dat_train %>% select(-Jaccard))[var]
-    pp_list_gbm[[var]] <- partial(
-        gbmModel, 
-        pred.var = pred_var, 
-        plot = FALSE)
-}
-
-
-pp_list <- list(pp_list_ranger, pp_list_xgb, pp_list_gbm)
-
-saveRDS(pp_list, "data/pp_list.rds")
-
-
-
-
-# ===== #
-## Evaluate model =====
-
-# Install necessary packages
-install_and_load(c("pdp", "ggplot2"))
-
-
-# Plotting
-ggplot() +
-  geom_line(data = partial1, aes(x = D_AOO_a, y = yhat)) +
-  geom_line(data = partial1b, aes(x = D_AOO_a, y = yhat), linetype = 
-"dashed") +
-
-  geom_line(data = partial2, aes(x = rel_occ_Ncells, y = yhat), col = 
-"red") +
-  geom_line(data = partial2b, aes(x = rel_occ_Ncells, y = yhat), 
-linetype = "dashed", col = "red") +
-  
-  geom_line(data = partial3, aes(x = moran, y = yhat), col = "blue") +
-  geom_line(data = partial3b, aes(x = moran, y = yhat), linetype = 
-"dashed", col = "blue") +
-
-#   geom_line(data = partial4, aes(x = AOO, y = yhat), col = 
-# "green") +
-# geom_line(data = partial4b, aes(x = AOO, y = yhat), linetype 
-# = "dashed", col = "green") +
-
-
-
-  labs(x = "Predictor", y = "Partial Dependence", title = "Partial 
-Dependence Plots")+
-  theme_bw()
-
-
-```
 ### Ensemble model
 
 Now we will compare randomForest to boosed regression trees or extreme
 gradient boosting.
 
 ```{r}
-pckgs2 <- c("caret", "caretEnsemble", "gbm", "xgboost", "kableExtra")
+pckgs2 <- c("caret", "caretEnsemble", "gbm", "xgboost")
 install_and_load(pckgs2)
 
 set.seed(42)
@@ -1035,7 +643,7 @@ modelsList <- caretList(
 
 p <- as.data.frame(predict(modelsList, newdata = dat_train)) %>% cbind(dat_train$Jaccard)
 
-kable(p)
+p
 xyplot(resamples(modelsList))
 # Create the ensemble model
 ensembleModel <- caretEnsemble(
