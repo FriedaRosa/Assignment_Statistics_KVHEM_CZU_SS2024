@@ -69,7 +69,7 @@ While I was investigating the issue of very low predictive power, I detected tha
 rm(list = ls())
 source("src/functions.R")
 
-pckgs <- c("dplyr", "ggplot2", "reshape2", "caret", "ggcorrplot", "recipes", "cito", "plotly", "igraph", "ggraph", "caretEnsemble", "randomForest", "ranger", "gbm", "xgboost")
+pckgs <- c("dplyr", "ggplot2", "reshape2", "caret", "ggcorrplot", "recipes", "cito", "plotly", "igraph", "ggraph", "caretEnsemble", "randomForest", "ranger", "gbm", "xgboost", "vegan")
 install_and_load(pckgs)
 
 # Neural Networks requirements:
@@ -295,6 +295,118 @@ model_dat <- dat %>%
 colSums(is.na(model_dat))
 # leaves us with 39 predictor variables to predict Jaccard similarity index
 ```
+
+### Variation Partitioning between Hypotheses
+
+
+```{r}
+# Load the vegan package
+library(vegan)
+
+# Create a data frame for each set of variables
+H1_data <- dat_train %>% select(any_of(H1_vars))
+H2_data <- dat_train%>% select(any_of(H2_vars))
+H3_data <- dat_train%>% select(any_of(H3_vars))
+H4_data <- dat_train%>% select(any_of(H4_vars))
+
+# Perform variation partitioning
+varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
+
+# Print the results
+print(varpart_model)
+
+# Plot the results as a Venn diagram
+plot(varpart_model)
+showvarparts(varpart_model)
+summary(varpart_model)
+```
+
+#### Trying a VENN-Diagram:
+
+```{r}
+# Load the VennDiagram package
+library(VennDiagram)
+
+# Perform variation partitioning
+varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data, scale = TRUE)
+
+# Extract the R-squared values
+r_squared <- round(varpart_model$part$fract$R.square, 4)
+
+round(varpart_model$part$fract,2) %>% 
+    kableExtra::kable() %>% 
+    write.csv("./data/VariationPart_results2.txt")
+# Create a list of the R-squared values
+r_squared_list <- list(
+  "H1" = r_squared[1],
+  "H2" = r_squared[2],
+  "H3" = r_squared[3],
+  "H4" = r_squared[4]
+)
+
+# Generate a Venn diagram
+venn.plot <- venn.diagram(r_squared_list, filename = "VennHypotheses_StaticPattern.pdf")
+
+# Plot the Venn diagram
+grid.draw(venn.plot)
+
+```
+
+
+```{r}
+# Load necessary libraries
+library(vegan)
+library(dplyr)
+library(eulerr)
+library(VennDiagram)
+
+# Create data frames for each set of variables
+H1_data <- dat_train %>% select(any_of(H1_vars))
+H2_data <- dat_train %>% select(any_of(H2_vars))
+H3_data <- dat_train %>% select(any_of(H3_vars))
+H4_data <- dat_train %>% select(any_of(H4_vars))
+
+# Perform variation partitioning
+varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
+
+# Print the results
+print(varpart_model)
+
+# Plot the results as a Venn diagram using eulerr
+# Extract the explained variances
+explained_variance <- varpart_model$part$indfract$Adj.R.square
+
+# Create a named vector of explained variances
+venn_data <- c(
+  "H1" = explained_variance[1],
+  "H2" = explained_variance[2],
+  "H3" = explained_variance[3],
+  "H4" = explained_variance[4],
+  "H1&H2" = explained_variance[5],
+  "H1&H3" = explained_variance[6],
+  "H1&H4" = explained_variance[7],
+  "H2&H3" = explained_variance[8],
+  "H2&H4" = explained_variance[9],
+  "H3&H4" = explained_variance[10],
+  "H1&H2&H3" = explained_variance[11],
+  "H1&H2&H4" = explained_variance[12],
+  "H1&H3&H4" = explained_variance[13],
+  "H2&H3&H4" = explained_variance[14],
+  "H1&H2&H3&H4" = explained_variance[15]
+) 
+venn_data[venn_data < 0] <- 0
+
+# Plot the Venn diagram using eulerr
+euler_plot <- euler(venn_data)
+plot(euler_plot, fills = TRUE, labels = TRUE)
+
+# Optional: Save the plot
+pdf("VennHypotheses_StaticPattern.pdf")
+plot(euler_plot, fills = TRUE, labels = TRUE)
+dev.off()
+
+```
+
 
 ## Modeling
 
@@ -611,57 +723,6 @@ ggplot(data = res_top_vars_df) +
 
 ```
 
-### Variation Partitioning between Hypotheses
-
-```{r}
-# Load the VennDiagram package
-library(VennDiagram)
-
-# Perform variation partitioning
-varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data, scale = TRUE)
-
-# Extract the R-squared values
-r_squared <- round(varpart_model$part$fract$R.square, 4)
-
-round(varpart_model$part$fract,2) %>% 
-    kableExtra::kable() %>% 
-    write.csv("./data/VariationPart_results2.txt")
-# Create a list of the R-squared values
-r_squared_list <- list(
-  "H1" = r_squared[1],
-  "H2" = r_squared[2],
-  "H3" = r_squared[3],
-  "H4" = r_squared[4]
-)
-
-# Generate a Venn diagram
-venn.plot <- venn.diagram(r_squared_list, filename = NULL)
-
-# Plot the Venn diagram
-grid.draw(venn.plot)
-
-```
-```{r}
-# Load the vegan package
-library(vegan)
-
-# Create a data frame for each set of variables
-H1_data <- dat_train %>% select(any_of(H1_vars))
-H2_data <- dat_train%>% select(any_of(H2_vars))
-H3_data <- dat_train%>% select(any_of(H3_vars))
-H4_data <- dat_train%>% select(any_of(H4_vars))
-
-# Perform variation partitioning
-varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
-
-# Print the results
-print(varpart_model)
-
-# Plot the results as a Venn diagram
-plot(varpart_model)
-showvarparts(varpart_model)
-summary(varpart_model)
-```
 ### Individual models
 
 #### Hyperparameter tuning
@@ -750,13 +811,15 @@ slice_max(gbmModel_t$results, Rsquared)
 save.image("./data/hyper_para_tuning.RData")
 ```
 
-#### Final models 
-##### Insights:
-1. Random Forest with Ranger
-Keeping in mind that splitrule = "extratrees" ignores the mtry argument (and rather performs random selection of variables). This should prevent overfitting and achieves a similar performance to mtry = intermediate number and splitrule = "variance". 
+#### Final models
 
-2. Extreme Gradient Boosted Trees
-3. Boosted Regression Trees
+##### Insights:
+
+1.  Random Forest with Ranger Keeping in mind that splitrule = "extratrees" ignores the mtry argument (and rather performs random selection of variables). This should prevent overfitting and achieves a similar performance to mtry = intermediate number and splitrule = "variance".
+
+2.  Extreme Gradient Boosted Trees
+
+3.  Boosted Regression Trees
 
 ```{r}
 #| label: final-models-ranger
@@ -900,6 +963,7 @@ p_pred_gbmModel <- ggplot(aes(observed, prediction), data = test_performance_gbm
 ```{r}
 
 ```
+
 ### Compare models
 
 ```{r}
