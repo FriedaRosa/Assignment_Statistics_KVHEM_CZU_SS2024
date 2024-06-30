@@ -1,0 +1,16 @@
+;Hypothesen; Df;R.square A;dj.R.square
+[aeghklno] ; X1;42;0.6843612;0.6674304
+[befiklmo] ; X2;18;0.7596068;0.7542449
+[cfgjlmno] ; X3;2;0.1270575;0.1249361
+[dhijkmno] ; X4;3;0.1534894;0.1504000
+[abefghiklmno] ; X1+X2;60;0.8422100;0.8298343
+[acefghjklmno] ; X1+X3;44;0.7315138;0.7163879
+[adeghijklmno] ; X1+X4;45;0.7490960;0.7346208
+[bcefgijklmno] ; X2+X3;20; 0.7710663;0.765378
+[bdefhijklmno] ; X2+X4;21; 0.7796012;0.773844
+[cdfghijklmno] ; X3+X4;5; 0.1620160;0.156906
+[abcefghijklmno] ; X1+X2+X3;62; 0.8466740;0.834215
+[abdefghijklmno] ; X1+X2+X4;63; 0.8491520;0.836680
+[acdefghijklmno] ; X1+X3+X4;47; 0.7626124;0.748271
+[bcdefghijklmno] ; X2+X3+X4;23; 0.7931744;0.787243
+[abcdefghijklmno] ; All;65; 0.8538565;0.841357

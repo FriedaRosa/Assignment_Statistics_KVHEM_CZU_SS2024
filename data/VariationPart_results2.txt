@@ -1,0 +1,16 @@
+		 Df	R.square	Adj.R.square
+[aeghklno] 	 X1	42	0.68	0.67
+[befiklmo] 	 X2	18	0.76	0.75
+[cfgjlmno] 	 X3	2	0.13	0.12
+[dhijkmno] 	 X4	3	0.15	0.15
+[abefghiklmno] 	 X1+X2	60	0.84	0.83
+[acefghjklmno] 	 X1+X3	44	0.73	0.72
+[adeghijklmno] 	 X1+X4	45	0.75	0.73
+[bcefgijklmno] 	 X2+X3	20	0.77	0.77
+[bdefhijklmno] 	 X2+X4	21	0.78	0.77
+[cdfghijklmno] 	 X3+X4	5	0.16	0.16
+[abcefghijklmno] 	 X1+X2+X3	62	0.85	0.83
+[abdefghijklmno] 	 X1+X2+X4	63	0.85	0.84
+[acdefghijklmno] 	 X1+X3+X4	47	0.76	0.75
+[bcdefghijklmno] 	 X2+X3+X4	23	0.79	0.79
+[abcdefghijklmno] 	 All	65	0.85	0.84
