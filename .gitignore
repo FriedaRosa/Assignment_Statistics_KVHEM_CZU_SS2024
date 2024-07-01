@@ -47,6 +47,7 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
-data/xgbModel_final.rds
 *.rds
 *.RData
+
+*.RDataTmp
