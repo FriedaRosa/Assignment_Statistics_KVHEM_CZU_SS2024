@@ -69,9 +69,6 @@ load("../data/RData/01_Data_prep.RData")
 ```{r}
 #| label: hyperparameter-tuning
 
-
-
-
 index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
 dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
 

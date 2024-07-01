@@ -16,6 +16,58 @@ format:
 keep-tex: true
 ---
 
+::: panel-tabset
+## Source custom functions
+
+```{r}
+#| label: load-packages
+#| message: FALSE
+#| warning: FALSE
+rm(list = ls())
+#setwd("StaticPatterNN/")
+source("../src/functions.R")
+
+```
+
+## MachineLearning packages
+
+```{r}
+#| label: load-ML-packages
+#| message: FALSE
+#| error: FALSE
+
+pckgs <- c("dplyr", "ggplot2", "reshape2", 
+           "ggcorrplot", 
+           "caret",  "recipes",   "caretEnsemble", 
+           "randomForest", "ranger", "gbm", "xgboost", 
+           "vegan", "pdp", 
+           "gridExtra", "kableExtra")
+
+install_and_load(pckgs)
+```
+
+## Load RData to reduce computing time
+
+```{r}
+#| label: load-RData
+#| message: FALSE
+#| error: FALSE
+
+# Load workspace to save computing time:
+## it has: varPart from ranger models
+## recursive feature selection results
+
+# load("data/varPart_rfe.RData")
+# load("data/models.RData")
+
+load("../data/RData/01_Data_prep.RData")
+J1_varPart_ranger_list <- readRDS("../data/J1_varPart_list.rds")
+J2_varPart_ranger_list <- readRDS("../data/J2_varPart_list.rds")
+LR1_varPart_ranger_list <- readRDS("../data/LR1_varPart_list.rds")
+LR2_varPart_ranger_list <- readRDS("../data/LR2_varPart_list.rds")
+```
+:::
+
 ### Variation Partitioning between Hypotheses
 
 Now we will look which of the four hypotheses explains most variation in the response.
@@ -26,6 +78,10 @@ First will will use the varpart function from the vegan package for this, and se
 
 ```{r}
 #| label: var-part-vegan-J1
+#| message: FALSE
+#| warning: FALSE
+#| error: FALSE
+
 dat_train <- dat_train_J1
 # Create a data frame for each set of variables
 H1_data <- dat_train %>% select(any_of(H1_vars))
@@ -34,16 +90,10 @@ H3_data <- dat_train %>% select(any_of(H3_vars))
 H4_data <- dat_train %>% select(any_of(H4_vars))
 
 # Perform basic variation partitioning (vegan package)
-varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
-
-# Print the results
-print(varpart_model)
-summary(varpart_model)
-
-
+varpart_model1 <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
 
 ## VENN-diagram
-plot(varpart_model,
+plot(varpart_model1,
      Xnames = c("Species Traits", "Species Range Geometry", "Diversity", "Atlas characteristics"), # name the partitions
      bg = c("seagreen3", "mediumpurple", "darkorange", "gold"), alpha = 80, # colour the circles
      digits = 2, # only show 2 digits
@@ -63,7 +113,12 @@ anova.cca(rda(dat_train$Jaccard, H4_data)) # sign. p = 0.001
 
 ```{r}
 #| label: var-part-vegan-J2
+#| message: FALSE
+#| warning: FALSE
+#| error: FALSE
+
 dat_train <- dat_train_J2
+
 # Create a data frame for each set of variables
 H1_data <- dat_train %>% select(any_of(H1_vars))
 H2_data <- dat_train %>% select(any_of(H2_vars))
@@ -71,31 +126,36 @@ H3_data <- dat_train %>% select(any_of(H3_vars))
 H4_data <- dat_train %>% select(any_of(H4_vars))
 
 # Perform basic variation partitioning (vegan package)
-varpart_model <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
+# varpart_model2 <- varpart(dat_train$Jaccard, H1_data, H2_data, H3_data, H4_data)
 
-# Print the results
-print(varpart_model)
-summary(varpart_model)
+# # Print the results
+# print(varpart_model2)
+# summary(varpart_model2)
 
-## VENN-diagram
-plot(varpart_model,
-     Xnames = c("Species Traits", "Species Range Geometry", "Diversity", "Atlas characteristics"), # name the partitions
-     bg = c("seagreen3", "mediumpurple", "darkorange", "gold"), alpha = 80, # colour the circles
-     digits = 2, # only show 2 digits
-     cex = 0.8,
-     id.size = 1)
+# ## VENN-diagram
+# plot(varpart_model2,
+#      Xnames = c("Species Traits", "Species Range Geometry", "Diversity", "Atlas characteristics"), # name the partitions
+#      bg = c("seagreen3", "mediumpurple", "darkorange", "gold"), alpha = 80, # colour the circles
+#      digits = 2, # only show 2 digits
+#      cex = 0.8,
+#      id.size = 1)
 
 # Test for significance in results:
 anova.cca(rda(dat_train$Jaccard, H1_data)) # sign. p = 0.001
 anova.cca(rda(dat_train$Jaccard, H2_data)) # sign. p = 0.001
 anova.cca(rda(dat_train$Jaccard, H3_data)) # sign. p = 0.001
 anova.cca(rda(dat_train$Jaccard, H4_data)) # sign. p = 0.001
+
 ```
 
 ## Log Ratio - Sampling Period 1
 
 ```{r}
 #| label: var-part-vegan-J1
+#| message: FALSE
+#| warning: FALSE
+#| error: FALSE
+
 dat_train <- dat_train_LR1
 # Create a data frame for each set of variables
 H1_data <- dat_train %>% select(any_of(H1_vars))
@@ -103,22 +163,22 @@ H2_data <- dat_train %>% select(any_of(H2_vars))
 H3_data <- dat_train %>% select(any_of(H3_vars))
 H4_data <- dat_train %>% select(any_of(H4_vars))
 
-# Perform basic variation partitioning (vegan package)
-varpart_model <- varpart(dat_train$log_R2_1, H1_data, H2_data, H3_data, H4_data)
+# # Perform basic variation partitioning (vegan package)
+# varpart_model3 <- varpart(dat_train$log_R2_1, H1_data, H2_data, H3_data, H4_data)
 
-# Print the results
-print(varpart_model)
-summary(varpart_model)
+# # Print the results
+# print(varpart_model3)
+# summary(varpart_model3)
 
 
 
-## VENN-diagram
-plot(varpart_model,
-     Xnames = c("Species Traits", "Species Range Geometry", "Diversity", "Atlas characteristics"), # name the partitions
-     bg = c("seagreen3", "mediumpurple", "darkorange", "gold"), alpha = 80, # colour the circles
-     digits = 2, # only show 2 digits
-     cex = 0.8,
-     id.size = 1)
+# ## VENN-diagram
+# plot(varpart_model3,
+#      Xnames = c("Species Traits", "Species Range Geometry", "Diversity", "Atlas characteristics"), # name the partitions
+#      bg = c("seagreen3", "mediumpurple", "darkorange", "gold"), alpha = 80, # colour the circles
+#      digits = 2, # only show 2 digits
+#      cex = 0.8,
+#      id.size = 1)
 
 
 # Test for significance in results:
@@ -133,6 +193,10 @@ anova.cca(rda(dat_train$log_R2_1, H4_data)) # sign. p = 0.001
 
 ```{r}
 #| label: var-part-vegan-J1
+#| message: FALSE
+#| warning: FALSE
+#| error: FALSE
+
 dat_train <- dat_train_LR2
 # Create a data frame for each set of variables
 H1_data <- dat_train %>% select(any_of(H1_vars))
@@ -141,16 +205,11 @@ H3_data <- dat_train %>% select(any_of(H3_vars))
 H4_data <- dat_train %>% select(any_of(H4_vars))
 
 # Perform basic variation partitioning (vegan package)
-varpart_model <- varpart(dat_train$log_R2_1, H1_data, H2_data, H3_data, H4_data)
-
-# Print the results
-print(varpart_model)
-summary(varpart_model)
-
+varpart_model4 <- varpart(dat_train$log_R2_1, H1_data, H2_data, H3_data, H4_data)
 
 
 ## VENN-diagram
-plot(varpart_model,
+plot(varpart_model4,
      Xnames = c("Species Traits", "Species Range Geometry", "Diversity", "Atlas characteristics"), # name the partitions
      bg = c("seagreen3", "mediumpurple", "darkorange", "gold"), alpha = 80, # colour the circles
      digits = 2, # only show 2 digits
@@ -169,10 +228,15 @@ anova.cca(rda(dat_train$log_R2_1, H4_data)) # sign. p = 0.001
 
 ::: panel-tabset
 ## Jaccard - Sampling Period 1
+run time at server: ca. 30 min
 
 ```{r}
 #| label: var-part-rf
 #| eval: FALSE
+
+index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
+dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
+
 dat_train <- dat_train_J1
 
 trainControl <- trainControl(
@@ -182,7 +246,7 @@ trainControl <- trainControl(
     savePredictions = "final",
     returnResamp = "final",
     verboseIter = TRUE,
-    index = indices)
+    index = indices_J1)
 
 tictoc::tic("ranger full model")
 set.seed(42)
@@ -414,30 +478,36 @@ saveRDS(J1_varPart_ranger_list, "../data/J1_varPart_list.rds")
 
 ```{r}
 #| label: var-part-ranger-performance-eval
+#| message: FALSE
+#| warning: FALSE
+#| error: FALSE
+
 # ===== Performance eval ======= #
-
+performances <- replicate(4, list())
+J1_varPart_ranger_list <- readRDS("../data/J1_varPart_list.rds")
+dat_test <- dat_test_J1
 # Predict on your test data
-predictions_full <- predict(full_ranger, newdata = dat_test)
+predictions_full <- predict(J1_varPart_ranger_list[[1]], newdata = dat_test)
 
-predictions_H1 <- predict(H1_ranger, newdata = dat_test)
-predictions_H2 <- predict(H2_ranger, newdata = dat_test)
-predictions_H3 <- predict(H3_ranger, newdata = dat_test)
-predictions_H4 <- predict(H4_ranger, newdata = dat_test)
+predictions_H1 <- predict(J1_varPart_ranger_list[[2]], newdata = dat_test)
+predictions_H2 <- predict(J1_varPart_ranger_list[[3]], newdata = dat_test)
+predictions_H3 <- predict(J1_varPart_ranger_list[[4]], newdata = dat_test)
+predictions_H4 <- predict(J1_varPart_ranger_list[[5]], newdata = dat_test)
 
-predictions_H1H2 <- predict(H1H2_ranger, newdata = dat_test)
-predictions_H1H3 <- predict(H1H3_ranger, newdata = dat_test)
-predictions_H1H4 <- predict(H1H4_ranger, newdata = dat_test)
-predictions_H2H3 <- predict(H2H3_ranger, newdata = dat_test)
-predictions_H2H4 <- predict(H2H4_ranger, newdata = dat_test)
-predictions_H3H4 <- predict(H3H4_ranger, newdata = dat_test)
+predictions_H1H2 <- predict(J1_varPart_ranger_list[[6]], newdata = dat_test)
+predictions_H1H3 <- predict(J1_varPart_ranger_list[[7]], newdata = dat_test)
+predictions_H1H4 <- predict(J1_varPart_ranger_list[[8]], newdata = dat_test)
+predictions_H2H3 <- predict(J1_varPart_ranger_list[[9]], newdata = dat_test)
+predictions_H2H4 <- predict(J1_varPart_ranger_list[[10]], newdata = dat_test)
+predictions_H3H4 <- predict(J1_varPart_ranger_list[[11]], newdata = dat_test)
 
-predictions_H1H2H3 <- predict(H1H2H3_ranger, newdata = dat_test)
-predictions_H1H2H4 <- predict(H1H2H4_ranger, newdata = dat_test)
-predictions_H1H3H4 <- predict(H1H3H4_ranger, newdata = dat_test)
-predictions_H2H3H4 <- predict(H2H3H4_ranger, newdata = dat_test)
+predictions_H1H2H3 <- predict(J1_varPart_ranger_list[[12]], newdata = dat_test)
+predictions_H1H2H4 <- predict(J1_varPart_ranger_list[[13]], newdata = dat_test)
+predictions_H1H3H4 <- predict(J1_varPart_ranger_list[[14]], newdata = dat_test)
+predictions_H2H3H4 <- predict(J1_varPart_ranger_list[[15]], newdata = dat_test)
 
 # Calculate the performance metrics
-perf <- rbind(postResample(pred = predictions_full, obs = dat_test$Jaccard),
+perf1 <- rbind(postResample(pred = predictions_full, obs = dat_test$Jaccard),
               postResample(pred = predictions_H1, obs = dat_test$Jaccard),
               postResample(pred = predictions_H2, obs = dat_test$Jaccard),
               postResample(pred = predictions_H3, obs = dat_test$Jaccard),
@@ -461,22 +531,24 @@ model <- c("full",
             seq(1:4), 
             "H1H2", "H1H3", "H1H4", "H2H3", "H2H4", "H3H4", 
             "H1H2H3", "H1H2H4", "H1H3H4", "H2H3H4")
-perf$model <- model
+perf1$model <- model
+perf1$subset <- "J1"
 
 # Print the performance metrics
 
-perf %>% 
+perf1 %>% 
     kableExtra::kable()
-perf %>% 
+perf1 %>% 
     kableExtra::kable() %>% 
     write.csv("../data/performance_varExpl_rf_J1.csv")
 
-slice_min(perf, RMSE) %>% 
-    slice_max(Rsquared)
+performances[[1]] <- list(
+    J1 = slice_min(perf1, RMSE) %>% 
+    slice_max(Rsquared))
 
 
 # Create a bar plot of variance explained
-ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
+ggplot(perf1, aes(x = reorder(model, RMSE), y = Rsquared)) +
   geom_bar(stat = "identity") +
   labs(x = "Model", y = "Variance Explained") +
   theme_minimal()
@@ -497,7 +569,7 @@ trainControl <- trainControl(
     savePredictions = "final",
     returnResamp = "final",
     verboseIter = TRUE,
-    index = indices)
+    index = indices_J2)
 
 tictoc::tic("ranger full model")
 set.seed(42)
@@ -730,29 +802,31 @@ saveRDS(J2_varPart_ranger_list, "../data/J2_varPart_list.rds")
 ```{r}
 #| label: var-part-ranger-performance-eval
 # ===== Performance eval ======= #
+dat_test <- dat_test_J2
+J2_varPart_ranger_list <- readRDS("../data/J2_varPart_list.rds")
 
 # Predict on your test data
-predictions_full <- predict(full_ranger, newdata = dat_test)
+predictions_full <- predict(J2_varPart_ranger_list[[1]], newdata = dat_test)
 
-predictions_H1 <- predict(H1_ranger, newdata = dat_test)
-predictions_H2 <- predict(H2_ranger, newdata = dat_test)
-predictions_H3 <- predict(H3_ranger, newdata = dat_test)
-predictions_H4 <- predict(H4_ranger, newdata = dat_test)
+predictions_H1 <- predict(J2_varPart_ranger_list[[2]], newdata = dat_test)
+predictions_H2 <- predict(J2_varPart_ranger_list[[3]], newdata = dat_test)
+predictions_H3 <- predict(J2_varPart_ranger_list[[4]], newdata = dat_test)
+predictions_H4 <- predict(J2_varPart_ranger_list[[5]], newdata = dat_test)
 
-predictions_H1H2 <- predict(H1H2_ranger, newdata = dat_test)
-predictions_H1H3 <- predict(H1H3_ranger, newdata = dat_test)
-predictions_H1H4 <- predict(H1H4_ranger, newdata = dat_test)
-predictions_H2H3 <- predict(H2H3_ranger, newdata = dat_test)
-predictions_H2H4 <- predict(H2H4_ranger, newdata = dat_test)
-predictions_H3H4 <- predict(H3H4_ranger, newdata = dat_test)
+predictions_H1H2 <- predict(J2_varPart_ranger_list[[6]], newdata = dat_test)
+predictions_H1H3 <- predict(J2_varPart_ranger_list[[7]], newdata = dat_test)
+predictions_H1H4 <- predict(J2_varPart_ranger_list[[8]], newdata = dat_test)
+predictions_H2H3 <- predict(J2_varPart_ranger_list[[9]], newdata = dat_test)
+predictions_H2H4 <- predict(J2_varPart_ranger_list[[10]], newdata = dat_test)
+predictions_H3H4 <- predict(J2_varPart_ranger_list[[11]], newdata = dat_test)
 
-predictions_H1H2H3 <- predict(H1H2H3_ranger, newdata = dat_test)
-predictions_H1H2H4 <- predict(H1H2H4_ranger, newdata = dat_test)
-predictions_H1H3H4 <- predict(H1H3H4_ranger, newdata = dat_test)
-predictions_H2H3H4 <- predict(H2H3H4_ranger, newdata = dat_test)
+predictions_H1H2H3 <- predict(J2_varPart_ranger_list[[12]], newdata = dat_test)
+predictions_H1H2H4 <- predict(J2_varPart_ranger_list[[13]], newdata = dat_test)
+predictions_H1H3H4 <- predict(J2_varPart_ranger_list[[14]], newdata = dat_test)
+predictions_H2H3H4 <- predict(J2_varPart_ranger_list[[15]], newdata = dat_test)
 
 # Calculate the performance metrics
-perf <- rbind(postResample(pred = predictions_full, obs = dat_test$Jaccard),
+perf2 <- rbind(postResample(pred = predictions_full, obs = dat_test$Jaccard),
               postResample(pred = predictions_H1, obs = dat_test$Jaccard),
               postResample(pred = predictions_H2, obs = dat_test$Jaccard),
               postResample(pred = predictions_H3, obs = dat_test$Jaccard),
@@ -776,22 +850,21 @@ model <- c("full",
             seq(1:4), 
             "H1H2", "H1H3", "H1H4", "H2H3", "H2H4", "H3H4", 
             "H1H2H3", "H1H2H4", "H1H3H4", "H2H3H4")
-perf$model <- model
-
+perf2$model <- model
+perf2$subset <- "J2"
 # Print the performance metrics
+performances[[2]] <- list(
+    J2 = slice_min(perf2, RMSE) %>% 
+    slice_max(Rsquared))
 
-perf %>% 
+perf2 %>% 
     kableExtra::kable()
-perf %>% 
+perf2 %>% 
     kableExtra::kable() %>% 
     write.csv("../data/performance_varExpl_rf_J2.csv")
 
-slice_min(perf, RMSE) %>% 
-    slice_max(Rsquared)
-
-
 # Create a bar plot of variance explained
-ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
+ggplot(perf2, aes(x = reorder(model, RMSE), y = Rsquared)) +
   geom_bar(stat = "identity") +
   labs(x = "Model", y = "Variance Explained") +
   theme_minimal()
@@ -812,7 +885,7 @@ trainControl <- trainControl(
     savePredictions = "final",
     returnResamp = "final",
     verboseIter = TRUE,
-    index = indices)
+    index = indices_LR1)
 
 tictoc::tic("ranger full model")
 set.seed(42)
@@ -835,7 +908,7 @@ tictoc::tic("ranger H1")
 set.seed(42)
 H1_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H1_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H1_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -851,7 +924,7 @@ tictoc::tic("ranger H2")
 set.seed(42)
 H2_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H2_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H2_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -867,7 +940,7 @@ tictoc::tic("ranger H3")
 set.seed(42)
 H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H3_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H3_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -882,7 +955,7 @@ tictoc::tic("ranger H4")
 set.seed(42)
 H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H4_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H4_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -899,7 +972,7 @@ tictoc::toc()
 set.seed(42)
 H1H2_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -912,7 +985,7 @@ H1H2_ranger <- train(
 set.seed(42)
 H1H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -925,7 +998,7 @@ H1H3_ranger <- train(
 set.seed(42)
 H1H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -939,7 +1012,7 @@ H1H4_ranger <- train(
 set.seed(42)
 H2H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H2_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H2_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -953,7 +1026,7 @@ H2H3_ranger <- train(
 set.seed(42)
 H2H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H2_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H2_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -966,7 +1039,7 @@ H2H4_ranger <- train(
 set.seed(42)
 H3H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H3_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H3_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -982,7 +1055,7 @@ H3H4_ranger <- train(
 set.seed(42)
 H1H2H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -995,7 +1068,7 @@ H1H2H3_ranger <- train(
 set.seed(42)
 H1H2H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1008,7 +1081,7 @@ H1H2H4_ranger <- train(
 set.seed(42)
 H1H3H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H3_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H3_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1021,7 +1094,7 @@ H1H3H4_ranger <- train(
 set.seed(42)
 H2H3H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1045,29 +1118,31 @@ saveRDS(LR1_varPart_ranger_list, "../data/LR1_varPart_list.rds")
 ```{r}
 #| label: var-part-ranger-performance-eval
 # ===== Performance eval ======= #
+dat_test <- dat_test_LR1
+LR1_varPart_ranger_list <- readRDS("../data/LR1_varPart_list.rds")
 
 # Predict on your test data
-predictions_full <- predict(full_ranger, newdata = dat_test)
+predictions_full <- predict(LR1_varPart_ranger_list[[1]], newdata = dat_test)
 
-predictions_H1 <- predict(H1_ranger, newdata = dat_test)
-predictions_H2 <- predict(H2_ranger, newdata = dat_test)
-predictions_H3 <- predict(H3_ranger, newdata = dat_test)
-predictions_H4 <- predict(H4_ranger, newdata = dat_test)
+predictions_H1 <- predict(LR1_varPart_ranger_list[[2]], newdata = dat_test)
+predictions_H2 <- predict(LR1_varPart_ranger_list[[3]], newdata = dat_test)
+predictions_H3 <- predict(LR1_varPart_ranger_list[[4]], newdata = dat_test)
+predictions_H4 <- predict(LR1_varPart_ranger_list[[5]], newdata = dat_test)
 
-predictions_H1H2 <- predict(H1H2_ranger, newdata = dat_test)
-predictions_H1H3 <- predict(H1H3_ranger, newdata = dat_test)
-predictions_H1H4 <- predict(H1H4_ranger, newdata = dat_test)
-predictions_H2H3 <- predict(H2H3_ranger, newdata = dat_test)
-predictions_H2H4 <- predict(H2H4_ranger, newdata = dat_test)
-predictions_H3H4 <- predict(H3H4_ranger, newdata = dat_test)
+predictions_H1H2 <- predict(LR1_varPart_ranger_list[[6]], newdata = dat_test)
+predictions_H1H3 <- predict(LR1_varPart_ranger_list[[7]], newdata = dat_test)
+predictions_H1H4 <- predict(LR1_varPart_ranger_list[[8]], newdata = dat_test)
+predictions_H2H3 <- predict(LR1_varPart_ranger_list[[9]], newdata = dat_test)
+predictions_H2H4 <- predict(LR1_varPart_ranger_list[[10]], newdata = dat_test)
+predictions_H3H4 <- predict(LR1_varPart_ranger_list[[11]], newdata = dat_test)
 
-predictions_H1H2H3 <- predict(H1H2H3_ranger, newdata = dat_test)
-predictions_H1H2H4 <- predict(H1H2H4_ranger, newdata = dat_test)
-predictions_H1H3H4 <- predict(H1H3H4_ranger, newdata = dat_test)
-predictions_H2H3H4 <- predict(H2H3H4_ranger, newdata = dat_test)
+predictions_H1H2H3 <- predict(LR1_varPart_ranger_list[[12]], newdata = dat_test)
+predictions_H1H2H4 <- predict(LR1_varPart_ranger_list[[13]], newdata = dat_test)
+predictions_H1H3H4 <- predict(LR1_varPart_ranger_list[[14]], newdata = dat_test)
+predictions_H2H3H4 <- predict(LR1_varPart_ranger_list[[15]], newdata = dat_test)
 
 # Calculate the performance metrics
-perf <- rbind(postResample(pred = predictions_full, obs = dat_test$log_R2_1),
+perf3 <- rbind(postResample(pred = predictions_full, obs = dat_test$log_R2_1),
               postResample(pred = predictions_H1, obs = dat_test$log_R2_1),
               postResample(pred = predictions_H2, obs = dat_test$log_R2_1),
               postResample(pred = predictions_H3, obs = dat_test$log_R2_1),
@@ -1091,22 +1166,24 @@ model <- c("full",
             seq(1:4), 
             "H1H2", "H1H3", "H1H4", "H2H3", "H2H4", "H3H4", 
             "H1H2H3", "H1H2H4", "H1H3H4", "H2H3H4")
-perf$model <- model
+perf3$model <- model
+perf3$subset <- "LR1"
+# Print the performance metrics
+performances[[3]] <- list(
+    LR1 = slice_min(perf3, RMSE) %>% 
+    slice_max(Rsquared))
 
 # Print the performance metrics
 
-perf %>% 
+perf3 %>% 
     kableExtra::kable()
-perf %>% 
+perf3 %>% 
     kableExtra::kable() %>% 
     write.csv("../data/performance_varExpl_rf_LR1.csv")
 
-slice_min(perf, RMSE) %>% 
-    slice_max(Rsquared)
 
-
-# Create a bar plot of variance explained
-ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
+ # Create a bar plot of variance explained
+ggplot(perf3, aes(x = reorder(model, RMSE), y = Rsquared)) +
   geom_bar(stat = "identity") +
   labs(x = "Model", y = "Variance Explained") +
   theme_minimal()
@@ -1127,7 +1204,7 @@ trainControl <- trainControl(
     savePredictions = "final",
     returnResamp = "final",
     verboseIter = TRUE,
-    index = indices)
+    index = indices_LR2)
 
 tictoc::tic("ranger full model")
 set.seed(42)
@@ -1150,7 +1227,7 @@ tictoc::tic("ranger H1")
 set.seed(42)
 H1_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H1_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H1_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1166,7 +1243,7 @@ tictoc::tic("ranger H2")
 set.seed(42)
 H2_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H2_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H2_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1182,7 +1259,7 @@ tictoc::tic("ranger H3")
 set.seed(42)
 H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H3_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H3_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1197,7 +1274,7 @@ tictoc::tic("ranger H4")
 set.seed(42)
 H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(H4_vars)),
+    data = dat_train %>% select(log_R2_1, any_of(H4_vars)),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1214,7 +1291,7 @@ tictoc::toc()
 set.seed(42)
 H1H2_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1227,7 +1304,7 @@ H1H2_ranger <- train(
 set.seed(42)
 H1H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1240,7 +1317,7 @@ H1H3_ranger <- train(
 set.seed(42)
 H1H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1254,7 +1331,7 @@ H1H4_ranger <- train(
 set.seed(42)
 H2H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H2_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H2_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1268,7 +1345,7 @@ H2H3_ranger <- train(
 set.seed(42)
 H2H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H2_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H2_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1281,7 +1358,7 @@ H2H4_ranger <- train(
 set.seed(42)
 H3H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H3_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H3_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1297,7 +1374,7 @@ H3H4_ranger <- train(
 set.seed(42)
 H1H2H3_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1310,7 +1387,7 @@ H1H2H3_ranger <- train(
 set.seed(42)
 H1H2H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1323,7 +1400,7 @@ H1H2H4_ranger <- train(
 set.seed(42)
 H1H3H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H3_vars, H4_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H3_vars, H4_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1336,7 +1413,7 @@ H1H3H4_ranger <- train(
 set.seed(42)
 H2H3H4_ranger <- train(
     log_R2_1 ~ .,
-    data = dat_train %>% select(Jaccard, any_of(c(H1_vars, H2_vars, H3_vars))),
+    data = dat_train %>% select(log_R2_1, any_of(c(H1_vars, H2_vars, H3_vars))),
     method = "ranger",
     trControl = trainControl,
     importance = "permutation",
@@ -1360,29 +1437,30 @@ saveRDS(LR2_varPart_ranger_list, "../data/LR2_varPart_list.rds")
 ```{r}
 #| label: var-part-ranger-performance-eval
 # ===== Performance eval ======= #
-
+dat_test <- dat_test_LR2
+LR2_varPart_ranger_list <- readRDS("../data/LR2_varPart_list.rds")
 # Predict on your test data
-predictions_full <- predict(full_ranger, newdata = dat_test)
+predictions_full <- predict(LR2_varPart_ranger_list[[1]], newdata = dat_test)
 
-predictions_H1 <- predict(H1_ranger, newdata = dat_test)
-predictions_H2 <- predict(H2_ranger, newdata = dat_test)
-predictions_H3 <- predict(H3_ranger, newdata = dat_test)
-predictions_H4 <- predict(H4_ranger, newdata = dat_test)
+predictions_H1 <- predict(LR2_varPart_ranger_list[[2]], newdata = dat_test)
+predictions_H2 <- predict(LR2_varPart_ranger_list[[3]], newdata = dat_test)
+predictions_H3 <- predict(LR2_varPart_ranger_list[[4]], newdata = dat_test)
+predictions_H4 <- predict(LR2_varPart_ranger_list[[5]], newdata = dat_test)
 
-predictions_H1H2 <- predict(H1H2_ranger, newdata = dat_test)
-predictions_H1H3 <- predict(H1H3_ranger, newdata = dat_test)
-predictions_H1H4 <- predict(H1H4_ranger, newdata = dat_test)
-predictions_H2H3 <- predict(H2H3_ranger, newdata = dat_test)
-predictions_H2H4 <- predict(H2H4_ranger, newdata = dat_test)
-predictions_H3H4 <- predict(H3H4_ranger, newdata = dat_test)
+predictions_H1H2 <- predict(LR2_varPart_ranger_list[[6]], newdata = dat_test)
+predictions_H1H3 <- predict(LR2_varPart_ranger_list[[7]], newdata = dat_test)
+predictions_H1H4 <- predict(LR2_varPart_ranger_list[[8]], newdata = dat_test)
+predictions_H2H3 <- predict(LR2_varPart_ranger_list[[9]], newdata = dat_test)
+predictions_H2H4 <- predict(LR2_varPart_ranger_list[[10]], newdata = dat_test)
+predictions_H3H4 <- predict(LR2_varPart_ranger_list[[11]], newdata = dat_test)
 
-predictions_H1H2H3 <- predict(H1H2H3_ranger, newdata = dat_test)
-predictions_H1H2H4 <- predict(H1H2H4_ranger, newdata = dat_test)
-predictions_H1H3H4 <- predict(H1H3H4_ranger, newdata = dat_test)
-predictions_H2H3H4 <- predict(H2H3H4_ranger, newdata = dat_test)
+predictions_H1H2H3 <- predict(LR2_varPart_ranger_list[[12]], newdata = dat_test)
+predictions_H1H2H4 <- predict(LR2_varPart_ranger_list[[13]], newdata = dat_test)
+predictions_H1H3H4 <- predict(LR2_varPart_ranger_list[[14]], newdata = dat_test)
+predictions_H2H3H4 <- predict(LR2_varPart_ranger_list[[15]], newdata = dat_test)
 
 # Calculate the performance metrics
-perf <- rbind(postResample(pred = predictions_full, obs = dat_test$log_R2_1),
+perf4 <- rbind(postResample(pred = predictions_full, obs = dat_test$log_R2_1),
               postResample(pred = predictions_H1, obs = dat_test$log_R2_1),
               postResample(pred = predictions_H2, obs = dat_test$log_R2_1),
               postResample(pred = predictions_H3, obs = dat_test$log_R2_1),
@@ -1406,22 +1484,26 @@ model <- c("full",
             seq(1:4), 
             "H1H2", "H1H3", "H1H4", "H2H3", "H2H4", "H3H4", 
             "H1H2H3", "H1H2H4", "H1H3H4", "H2H3H4")
-perf$model <- model
+perf4$model <- model
 
 # Print the performance metrics
 
-perf %>% 
+perf4 %>% 
     kableExtra::kable()
-perf %>% 
+perf4 %>% 
     kableExtra::kable() %>% 
     write.csv("../data/performance_varExpl_rf_LR2.csv")
 
-slice_min(perf, RMSE) %>% 
-    slice_max(Rsquared)
+perf4$subset <- "LR2"
+# Print the performance metrics
+performances[[4]] <- list(
+    LR2 = slice_min(perf4, RMSE) %>% 
+    slice_max(Rsquared))
+
 
 
 # Create a bar plot of variance explained
-ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
+ggplot(perf4, aes(x = reorder(model, RMSE), y = Rsquared)) +
   geom_bar(stat = "identity") +
   labs(x = "Model", y = "Variance Explained") +
   theme_minimal()
@@ -1430,5 +1512,6 @@ ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
 :::
 
 ```{r}
-save.image("../data/RData/04_VarPart.RData")
+do.call(rbind, unlist(performances, recursive = F)) %>% kableExtra::kable()
+# save.image("../data/RData/04_VarPart.RData")
 ```

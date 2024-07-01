@@ -1,5 +1,4 @@
 # Functions for Machine Learning Assignment #
-library(dplyr)
 
 # Install Packages function ============
 install_and_load <- function(package_list) {
@@ -13,15 +12,16 @@ install_and_load <- function(package_list) {
   }
 }
 
+## load dependencies of functions ##
+install_and_load(
+  c("caret", "caretEnsemble", "plyr", "dplyr", "randomForest", "recipes", "kableExtra"))
 
-# Pre-process the raw predictor data
+
+# Pre-process the raw predictor data ============
 process_data <- function(file_path, tp_value, response, vars) {
   dat <- readRDS(file_path) %>%
-    # filter for highest resolution and specified time period
     filter(cell_grouping == 1 & exclude == 0 & tp == tp_value) %>%
-    # select necessary columns
     select(all_of(c(response, vars))) %>%
-    # Fixing NAs
     mutate(
       D_AOO_a = case_when(
         is.na(D_AOO_a) & rel_occ_Ncells > 0.97 ~ 2,
@@ -32,9 +32,7 @@ process_data <- function(file_path, tp_value, response, vars) {
         TRUE ~ mean_prob_cooccur
       )
     ) %>%
-    # Delete those species occupying 100% of area (Moran's I = NA)
     filter(!is.na(moran)) %>%
-    # Transform all characters to factors for modeling
     mutate_if(is.character, as.factor)
 
   # Convert specific columns to factors if needed
@@ -46,14 +44,15 @@ process_data <- function(file_path, tp_value, response, vars) {
 
 
 
-# NA summarise
+# NA summarise ============
 summarize_NA <- function(dat) {
 result <- dat %>%
   summarise(across(everything(), ~ sum(is.na(.)))) %>%
-  tidyr::pivot_longer(cols = everything(), names_to = "Variable", values_to = "NA_Count")
+  tidyr::pivot_longer(cols = everything(), names_to = "Variable", values_to = "NA_Count") %>%
+  filter(NA_Count > 0)
 
 # Print the table using kable
-kable(result)
+kableExtra::kable(result)
 }
 
 
@@ -128,7 +127,7 @@ rfRFE1 <- list(
   },
   pred = function(object, x) predict(object, x),
   rank = function(object, x, y) {
-    vimp <- varImp(object, type = 1, scale = TRUE)
+    vimp <- caret::varImp(object, type = 1, scale = TRUE)
     vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
     vimp$var <- rownames(vimp)
     vimp
@@ -139,7 +138,7 @@ rfRFE1 <- list(
 
 
 rank <- function (object, x, y){
-  vimp <- varImp(object, type = 1, scale = TRUE)
+  vimp <- caret::varImp(object, type = 1, scale = TRUE)
   if (is.factor(y)) {
     if (all(levels(y) %in% colnames(vimp))) {
       avImp <- apply(vimp[, levels(y), drop = TRUE], 1,
@@ -150,8 +149,6 @@ rank <- function (object, x, y){
   vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
   if (ncol(x) == 1) {
     vimp$var <- colnames(x)
-  }
-  else vimp$var <- rownames(vimp)
+  } else vimp$var <- rownames(vimp)
   vimp
 }
-

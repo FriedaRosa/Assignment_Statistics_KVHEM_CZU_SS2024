@@ -72,9 +72,9 @@ index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
 dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
 
 saved_profiles <- replicate(4, list())
-names(saved_profiles) <- c("J1", "J2", "LR1", "LR2")
+# names(saved_profiles) <- c("J1", "J2", "LR1", "LR2")
 save_imp <- replicate(4, list())
-names(save_imp) <- c("J1", "J2", "LR1", "LR2")
+# names(save_imp) <- c("J1", "J2", "LR1", "LR2")
 
 response_list <- c("Jaccard", "Jaccard", "log_R2_1", "log_R2_1")
 
@@ -83,7 +83,9 @@ for(j in seq_along(1:4)){
   indices <- index_list[[j]]
   dat_train <- dat_train_list[[j]]
   response <- response_list[[j]] 
-
+  saved_profiles[[j]] <- replicate(50, list())
+  save_imp[[j]] <- replicate(50, list())
+  
   ## Recursive feature selection:
   set.seed(42)
   ctrl <- rfeControl(
@@ -92,62 +94,59 @@ for(j in seq_along(1:4)){
     number = 10,
     repeats = 3,
     returnResamp = "all", # we need all resamples
-    verbose = TRUE,
+    verbose = FALSE,
     index = indices,
     saveDetails = TRUE)
 
-  ## Set variables for loop
+  ctrl$functions$rank <- rank #adjust rank function
+
+  ## Set variables for recursive feature elimination
   subsets <- c(1:50) # number of predictors in each run
   x <- dat_train %>% select(!all_of(response))
   y <- dat_train %>% pull(response)
-
   
-  tictoc::tic(paste("rfe-loop-100-runs", response))
-  for (i in 1:100){
+  ## First run:
+  set.seed(42)
+  rfProfile <- rfe(x, y, sizes = subsets, rfeControl = ctrl, ntrees = 5000)
+  rfProfile
     
-    ## First run:
-    rfProfile <- rfe(x, y, sizes = subsets, rfeControl = ctrl, ntrees = 500)
-    rfProfile
+  # Most important predictors:
+  imp <- as.data.frame(rfProfile$fit$importance) %>%
+                   round(3) %>%
+                   select(`%IncMSE`) %>% 
+                   mutate(var = row.names(.)) %>%
+                   arrange(desc(`%IncMSE`))    
     
-    # Most important predictors:
-    imp <- rfProfile$fit$importance %>% 
-      round(3) %>% 
-      as.data.frame() %>%
-      select("%IncMSE") %>%
-      arrange(desc(.))
-    
-    saved_profiles[[j]][[i]] <- rfProfile
-    saved_imp[[j]][[i]] <- imp
-    }
-  tictoc::toc()
-  }
+  saved_profiles[[j]] <- rfProfile
+  save_imp[[j]] <- imp
+}
 
-saveRDS("../data/RData/02_rfe_saved_profiles.rds")
-save.image("../data/rfe.RData")
+saveRDS(saved_profiles, file = "../data/02_rfe_saved_profiles.rds")
+save.image(file = "../data/RData/rfe.RData")
 ```
 
 ```{r}
 #| label: rfe-results
 #| fig.height: 10
 #| fig.width: 8
+#
 
-load("../data/rfe.RData")
+load("../data/RData/rfe.RData")
 
-results <- replicate(100, list())
-for(j in seq_along(1:4)){
-    for (i in seq_along(1:100)){
-        resamp_res <- saved_profiles[[j]][[i]]
+results <- replicate(4, list())
+    for (i in seq_along(1:4)){
+        resamp_res <- saved_profiles[[i]]
         res <- slice_min(resamp_res$results, RMSE)
-        results[[j]][[i]] <- res
+        results[[i]] <- res
     }
-}
+
 
 names(results) <- c("J1", "J2", "LR1", "LR2")
 
-rfe_res <- do.call(rbind, unlist(results, recursive = FALSE))
-rfe_res$dd <- rep(c("J1", "J2", "LR1", "LR2"), 100)
+rfe_res <- do.call(rbind, results)
+rfe_res$dd <- c("J1", "J2", "LR1", "LR2")
 ggplot(data = rfe_res, aes(x = dd, y = Variables)) +
-    geom_boxplot() +
+    geom_col() +
     geom_point(data = rfe_res %>% group_by(dd) %>% summarize(mean_Variables = mean(Variables)), 
     aes(x = dd, y = mean_Variables), color = "red") +
     theme_bw()
@@ -155,18 +154,15 @@ ggplot(data = rfe_res, aes(x = dd, y = Variables)) +
 rfe_res %>% group_by(dd) %>% summarize(mean_Variables = mean(Variables)) # 25.4 for both
 rfe_res %>% group_by(dd) %>% summarize(median_Variables = median(Variables)) # 26 for default, 24 for simple. Let's go with the results for the default model: 26.
 
-saved_res2 <- unlist(saved_profiles, recursive = FALSE)
-saved_res3 <- saved_res2[c(seq(from = 1, to = 20, by = 2))] # keep only default models
-
 res_top_vars <- list()
-for(i in seq_along(saved_res3)){
+for(i in seq_along(rfe_res)){
 
 res_top_vars[[i]] <- data.frame(
-    var = row.names(varImp(saved_res3[[i]], scale = T)),
-    Imp = varImp(saved_res3[[i]])$Overall,
-    include = c(rep_len(1, as.numeric(saved_res3[[i]]$bestSubset)), 
+    var = row.names(varImp(saved_profiles[[i]]$fit$importance, scale = T)),
+    Imp = varImp(saved_profiles[[i]])$Overall,
+    include = c(rep_len(1, as.numeric(saved_profiles[[i]]$bestSubset)), 
                 rep_len(0,  
-                length(row.names(varImp(saved_res3[[i]], scale = T)))-as.numeric(saved_res3[[i]]$bestSubset))
+                length(row.names(varImp(saved_profiles[[i]], scale = T)))-as.numeric(saved_profiles[[i]]$bestSubset))
             ),
     model = i
         )
@@ -181,20 +177,14 @@ res_top_vars_df <- do.call(rbind, res_top_vars)
 # Calculate the maximum count of resamples for scaling
 max_count <- res_top_vars_df %>% count(var) %>% pull(n) %>% max()
 
-ggplot(data = res_top_vars_df) +
+ggplot(data = res_top_vars_df %>% filter(model == 1)) +
   # Background rectangles
   geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 10.5), 
             fill = "lightgray", alpha = 0.9) +
   # Box plot
-  geom_boxplot(aes(y = reorder(var, Imp), x = Imp)) +
-  # Bar plot scaled to the secondary axis
-  geom_bar(aes(y = reorder(var, Imp), x = after_stat(count) / max_count * max(res_top_vars_df$Imp), 
-               fill = factor(include)), stat = "count",  alpha = 0.3) +
+  geom_col(aes(y = reorder(var, Imp), x = Imp)) +
   # Horizontal line
   geom_hline(yintercept = 10.5) +
-  # Secondary axis that stretches through the entire range
-  scale_x_continuous(sec.axis = sec_axis(~ . * max_count / max(res_top_vars_df$Imp), 
-                                         name = "Count Resamples (Secondary Axis)")) +
   # Scale and theme
   scale_fill_manual(values = c("#D55E00", "#009E73")) +
   theme_bw() +
