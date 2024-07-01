@@ -1,8 +1,8 @@
 Version: 1.0
 
 RestoreWorkspace: No
-SaveWorkspace: Yes
-AlwaysSaveHistory: No
+SaveWorkspace: No
+AlwaysSaveHistory: Yes
 
 EnableCodeIndexing: Yes
 UseSpacesForTab: Yes
@@ -21,10 +21,9 @@ PackageInstallArgs: --no-multiarch --with-keep.source
 PackageRoxygenize: rd,collate,namespace,vignette
 
 QuitChildProcessesOnExit: Yes
-DisableExecuteRprofile: Yes
 
 MarkdownWrap: Sentence
-MarkdownReferences: Section
+MarkdownReferences: Document
 
 ZoteroLibraries: "My Library"
 
