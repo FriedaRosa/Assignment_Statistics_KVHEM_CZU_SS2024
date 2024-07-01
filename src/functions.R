@@ -1,4 +1,5 @@
 # Functions for Machine Learning Assignment #
+library(dplyr)
 
 # Install Packages function ============
 install_and_load <- function(package_list) {
@@ -55,4 +56,102 @@ result <- dat %>%
 kable(result)
 }
 
+
+
+##############
+library(caret); library(caretEnsemble)
+## Default summary function (rfFuncs)
+rfFuncs <- list(
+  summary =
+    function (data, lev = NULL, model = NULL) {
+      if (is.character(data$obs))
+        data$obs <- factor(data$obs, levels = lev)
+      postResample(data[, "pred"], data[, "obs"])
+    },
+
+  fit =
+    function (x, y, first, last, ...) {
+      loadNamespace("randomForest")
+      randomForest::randomForest(x, y, importance = TRUE, ...)
+    },
+
+  pred =
+    function (object, x) {
+      tmp <- predict(object, x)
+      if (is.factor(object$y)) {
+        out <- cbind(data.frame(pred = tmp), as.data.frame(predict(object,
+                                                                   x, type = "prob"), stringsAsFactors = TRUE))}
+      else out <- tmp
+      out
+    },
+
+  rank =
+    function (object, x, y) {
+      vimp <- varImp(object)
+      if (is.factor(y)) {
+        if (all(levels(y) %in% colnames(vimp))) {
+          avImp <- apply(vimp[, levels(y), drop = TRUE], 1, mean)
+          vimp$Overall <- avImp}
+      }
+      vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
+      if (ncol(x) == 1) {
+        vimp$var <- colnames(x)}
+      else vimp$var <- rownames(vimp)
+      vimp
+    },
+
+  selectSize =
+    function (x, metric, maximize) {
+      best <- if (maximize)
+        which.max(x[, metric])
+      else which.min(x[, metric])
+      min(x[best, "Variables"])
+    },
+
+  selectVar =
+    function (y, size) {
+      finalImp <- ddply(y[, c("Overall", "var")], .(var), function(x) mean(x$Overall,
+                                                                           na.rm = TRUE))
+      names(finalImp)[2] <- "Overall"
+      finalImp <- finalImp[order(finalImp$Overall, decreasing = TRUE), ]
+      as.character(finalImp$var[1:size])
+    }
+)
+
+
+## Custom summary function for randomForest (simplified)
+rfRFE1 <- list(
+  summary = defaultSummary,
+  fit = function(x, y, first, last, ...) {
+    library(randomForest)
+    randomForest(x, y, importance = first, ...)
+  },
+  pred = function(object, x) predict(object, x),
+  rank = function(object, x, y) {
+    vimp <- varImp(object, type = 1, scale = TRUE)
+    vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
+    vimp$var <- rownames(vimp)
+    vimp
+  },
+  selectSize = pickSizeBest,
+  selectVar = pickVars
+)
+
+
+rank <- function (object, x, y){
+  vimp <- varImp(object, type = 1, scale = TRUE)
+  if (is.factor(y)) {
+    if (all(levels(y) %in% colnames(vimp))) {
+      avImp <- apply(vimp[, levels(y), drop = TRUE], 1,
+                     mean)
+      vimp$Overall <- avImp
+    }
+  }
+  vimp <- vimp[order(vimp$Overall, decreasing = TRUE), , drop = FALSE]
+  if (ncol(x) == 1) {
+    vimp$var <- colnames(x)
+  }
+  else vimp$var <- rownames(vimp)
+  vimp
+}
 

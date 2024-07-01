@@ -1,0 +1,975 @@
+---
+title: "MachineLearning - Script 1 - Data preparation"
+author: 
+  - name: "MSc. Friederike Johanna Rosa Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "https://friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: "2023-05-29"
+format: 
+  html:
+    toc: true
+    code-fold: true
+    code-overflow: wrap
+    bibliography: references.bib
+keep-tex: true
+---
+
+
+# Assignment for PhD Statistics class 2024
+
+------------------------------------------------------------------------
+
+## **Topic of Credit Report -- Statistical Methods** - Prague, 07.05.2024
+
+[Title of report:]{.underline} *Towards predicting temporal biodiversity change from static patterns*
+
+[Name:]{.underline} MSc. Friederike Wölke
+
+[Supervisor:]{.underline} Dr. Petr Keil
+
+[Thesis title:]{.underline} Universal imprints of temporal change in static spatial patterns of biodiversity
+
+[Expected methods applied:]{.underline}
+
+-   Machine learning [(random forest regression from ranger package; using the caret suite of tools for hyperparameter tuning)]{style="color:red;"}
+-   visualization of results (ggplot2, partial plots, BAM chart).
+
+[Abstract:]{.underline}
+
+The world is undergoing significant environmental transformations, impacting biodiversity and ecosystem functions. Since obtaining temporal replication of biodiversity data is challenging due to cost and monitoring limitations, I aim at predicting temporal trends in species occupancy without requiring temporally replicated data.
+
+Biodiversity kinetics leave characteristics imprint in the spatial patterns that we can see from geo-referenced presence/absence data because the underlying processes such as extinction and colonization happen across space.
+
+I aim at predicting the log ratio of temporal change in occupancy (i.e., the sum of area occupied by a species) between two sampling periods from a set of predictor variables that are either related to **H1) species traits and ecology**, **H2)  geometric features of the species range from a single sampling period**, **H3) biodiversity equilibrium dynamics via spatial diversity patterns**,  or **H4) to the characteristics of the study region** -- all of which may equally contribute and act in concert to explaining the temporal process that is underlying the spatial pattern.
+
+For this I use high-quality, spatially continuous atlas data from four breeding bird atlases from temperate zones across the globe. Atlas data comes with spatial grids that enable easy up- and down scaling of the data.
+
+Here, I assess universal imprints of temporal change in breeding birds in Czech Republic, Japan, New York State and the whole of Europe across two aggregated sampling periods that took place pre-2000 and post-2000. Since data for two sampling periods are available, I will additionally test whether imprints in the spatial aggregation of species can better predict past or future biodiversity change.
+
+For this, I collated 60 predictor variables that vary across sampling periods - each belonging to one of the hypotheses mentioned above. I will use random forest regression to determine the capability of static patterns to predict temporal change, identify the most important predictor variables and compare observed versus predicted results.
+
+If my model can predict temporal change from static patterns, this method will be a useful tool for estimating temporal change in areas and for species where repeated monitoring might not be feasible. If the models are only partially able to predict temporal trends, the important predictors may still yield insights into how temporal processes are acting across space. Additionally disentangling whether imprints of biodiversity kinetics are better at explaining past versus future change may help to understand the temporal dimensions of the imprints.
+
+------------------------------------------------------------------------
+
+## Adjustments to the topic
+
+In June 2024, I attended the annual Macroecology & Biogeography meeting of the GfÖ society in Marburg, Germany, which was under the theme **Artificial Intelligence in Biogeography and Macroecology**. Talks and posters at the conference mostly concerned machine learning techniques for biodiversity research. Following a talk by Dr. Florian Hartig on perks and drawbacks of different machine learning methods for inference models, I decided to switch from the application of random forest models to neural networks since these are said to be more accurate for complex situations with many predictors. In his talk, Dr. Hartig elaborated about random forest being unable to predict with uncorrelated data since predictor variables included in the building of a certain tree tend to borrow strength from other predictors (which are not included) and therefore lead to false variable importance when extracted across the full forest.
+
+Moreover, inferring log ratio of AOO change may have been the wrong response variable to begin with for this project, since the distribution of this variable was predominantly centered around zero with few extreme cases of extreme increase or decrease, while predictor variables varied heavily, leading to the conclusion that there is just not enough signal in the log ratio for predictions.
+
+While I was investigating the issue of very low predictive power, I detected that, although the change in occupied area is most often zero, spatial patterns of species distributions do change, suggesting that a measure of turnover may be better suited to characterize the temporal change in species distributions. Hence, I calculated *Jaccard index of similarity* on species level across sites (i.e., the site-similarity for a species from one sampling period to the next), to capture the spatial change signal in the occupancy data.
+
+------------------------------------------------------------------------
+
+# The Analysis
+
+I will start by sourcing some functions that I have wrote to simplify my code. The first is `load_and_install()` and it's supposed to suppress the start messages from the packages while installing and loading all packages that are not already installed and loaded.
+
+::: panel-tabset
+## Source custom functions
+
+
+```{r}
+#| label: load-packages
+#| message: FALSE
+#| warning: FALSE
+rm(list = ls())
+source("../src/functions.R")
+
+```
+
+
+## MachineLearning packages
+
+
+```{r}
+#| label: load-ML-packages
+#| message: FALSE
+#| error: FALSE
+
+pckgs <- c("dplyr", "ggplot2", "reshape2", 
+           "ggcorrplot", 
+           "caret",  "recipes",   "caretEnsemble", 
+           "randomForest", "ranger", "gbm", "xgboost", 
+           "vegan", "pdp", 
+           "gridExtra", "kableExtra")
+
+install_and_load(pckgs)
+```
+
+
+## NeuralNetworks packages
+
+
+```{r}
+#| label: load-NN-packages
+#| message: FALSE
+#| error: FALSE
+
+NN_pckgs <- install_and_load(c("cito",  "plotly", "igraph", "ggraph" ))
+# Neural Networks requirements:
+if (!require("torch", quietly = TRUE)) install.packages("torch")
+library("torch")
+
+# install torch
+if (!torch_is_installed()) install_torch()
+```
+
+
+## Load RData to reduce computing time
+
+
+```{r}
+#| label: load-RData
+#| message: FALSE
+#| error: FALSE
+
+# Load workspace to save computing time:
+## it has: varPart from ranger models
+## recursive feature selection results
+
+# load("data/varPart_rfe.RData")
+# load("data/models.RData")
+```
+
+:::
+
+## The data
+
+Since the raw data is not open, I am providing the (reduced) predictor table that I calculated from it and other external data.
+
+The data has bird species in rows (`verbatim_name`) and their predictor data across different datasets (`dataset`) in columns.
+
+The column `log_R2_1` is the log ratio of AOO (area of occupancy) between two sampling periods (indicated with `tp = 1` or `tp = 2`) and was the inital response for my temporal change models.
+
+`Telfer_1_2` is another measure of temporal change, though it is relative for each species in a dataset in comparison to the average other species. Telfer will not be further investigated in this assignment.
+
+`Jaccard` is the Jaccard index of similarity and indicates how similar ( 0 - 1) two species ranges are across different sampling periods.
+
+# Preparations
+
+## Data handling
+
+Here I'm excluding some predictors which are overlapping with some others.
+
+Next, I'm splitting the data into their time periods. In the following I will only continue to investigate the change from period 1 to period 2 (i.e, future change).
+
+Some predictor columns have NAs that result from either very rare species or highly cosmopolitan species (thus resulting in division by 0 during computation). With knowledge of how I computed the predictors, I manually set some rows with NAs to 0 or 1.
+
+Spatial autocorrelation (Moran's I) cannot be calculated for species occupying 100% of an area, thus resulting in NA. These species are removed completely from the model as there is no way to impute this value.
+
+# Hypotheses
+
+::: panel-tabset
+## Hypothesis 1: Species Traits
+
+
+```{r}
+#| label: set-up-variables-H1
+#| message: FALSE
+
+H1_vars <- c(
+    "sd_PC1", "sd_PC2",
+    "GlobRangeSize_m2", "IUCN", "Mass", "Habitat", "Habitat.Density",
+    "Migration", "Trophic.Level", "Trophic.Niche", "Primary.Lifestyle",
+    "FP", "Hand.Wing.Index")
+```
+
+
+## Hypothesis 2: Species range geometry
+
+
+```{r}
+#| label: set-up-variables-H2
+#| message: FALSE
+
+H2_vars <- c(
+    "AOO", "rel_occ_Ncells", "mean_prob_cooccur", "D_AOO_a", 
+    "moran", "x_intercept", "sp_centr_lon", "sp_centr_lat",
+    "lengthMinRect", "widthMinRect", "elonMinRect", "bearingMinRect",
+    "circ", "bearing", "Southernness", "Westernness",
+    "rel_maxDist", "rel_ewDist", "rel_nsDist", "rel_elonRatio",
+    "rel_relCirc", "rel_circNorm", "rel_lin", "Dist_centroid_to_COG",
+    "maxDist_toBorder_border", "maxDist_toBorder_centr",
+    "minDist_toBorder_centr")
+```
+
+
+## Hypothesis 3: Diversity Metrics
+
+
+```{r}
+#| label: set-up-variables-H3
+#| message: FALSE
+
+H3_vars <- c("GammaSR", "AlphaSR_sp", "BetaSR_sp")
+```
+
+
+## Hypothesis 4: Atlas geometry
+
+
+```{r}
+#| label: set-up-variables-H4
+#| message: FALSE
+
+H4_vars <- c(
+    "dataset", "mean_area", "Total_area_samp", "Total_Ncells_samp",
+    "mean_cell_length", "atlas_lengthMinRect", "atlas_widthMinRect",
+    "atlas_elonMinRect", "atlas_circ", "atlas_bearingMinRect",
+    "atlas_bearing", "AtlasCOG_long", "AtlasCOG_lat")
+
+```
+
+:::
+
+# Create data subsets
+
+In the following part we will create 4 different datasets from our data table. We will be assessing whether change in occupied area (`log Ratio AOO`) or change in sites (`Jaccard`) can be better predicted per species, and whether past (`tp = 1`) or future (`tp = 2`) change can be better predicted.
+
+## 1. Site Turnover:
+
+::: panel-tabset
+### Jaccard 1. Sampling period
+
+
+```{r}
+#| label: Jaccard-1-data-prep
+response <- "Jaccard"
+vars <- c(H1_vars, H2_vars, H3_vars, H4_vars)
+tp_value <- 1
+file_path <- "../data/AllPredictors.rds"
+
+# Function to process the data
+dat_J1 <- process_data(file_path, tp_value, response, vars)
+
+# Check NAs
+summarize_NA(dat_J1)
+
+```
+
+
+### Jaccard 2. Sampling period
+
+
+```{r}
+#| label: Jaccard-2-data-prep
+response <- "Jaccard"
+vars <- c(H1_vars, H2_vars, H3_vars, H4_vars)
+tp_value <- 2
+file_path <- "../data/AllPredictors.rds"
+
+# Function to process the data
+dat_J2 <- process_data(file_path, tp_value, response, vars)
+
+# Check NAs
+summarize_NA(dat_J2)
+
+
+```
+
+
+### Distribution
+
+The distribution shows that our data spans the full range of Jaccard 0 to 1 and (besides Europe), the variable seems to be distributed uniformly. This can be advantageous for prediction modeling as most events are equally likely and data partitioning will most probably not bias the training data towards a certain pattern.
+
+
+```{r}
+# Plot response distribution
+dat_J1 %>%
+    select(Jaccard, dataset) %>%
+    melt(id.vars = "dataset") %>%
+    ggplot(aes(x = value, fill = dataset)) +
+    geom_histogram(bins = 30, color = "black") +
+    facet_wrap(~variable, scales = "free_x") +
+    scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+    theme_bw() +
+    labs(
+        title = "Species-level Jaccard index of site-similarity",
+        x = "Jaccard",
+        y = "Frequency"
+    ) +
+    facet_wrap(dataset ~ .)
+```
+
+:::
+
+## 2. Area change
+
+::: panel-tabset
+### Log Ratio 1. Sampling period
+
+
+```{r}
+#| label: logRatio-1-data-prep
+response <- "log_R2_1"
+vars <- c(H1_vars, H2_vars, H3_vars, H4_vars)
+tp_value <- 1
+file_path <- "../data/AllPredictors.rds"
+
+# Function to process the data
+dat_LR1 <- process_data(file_path, tp_value, response, vars)
+
+# Check NAs
+summarize_NA(dat_LR1)
+```
+
+
+### Log Ratio 2. Sampling period
+
+
+```{r}
+#| label: logRatio-2-data-prep
+response <- "log_R2_1"
+vars <- c(H1_vars, H2_vars, H3_vars, H4_vars)
+tp_value <- 2
+file_path <- "../data/AllPredictors.rds"
+
+# Function to process the data
+dat_LR2 <- process_data(file_path, tp_value, response, vars)
+
+# Check NAs
+summarize_NA(dat_LR2)
+```
+
+
+### Distribution
+
+We can see that the response variable log Ratio has little variation and is mainly distributed around 0. This may be a sign of weak signal of temporal change in this variable, and thus lead to low predictive performance.
+
+
+```{r}
+# Plot response distribution
+dat_LR1 %>%
+    select(log_R2_1, dataset) %>%
+    melt(id.vars = "dataset") %>%
+    ggplot(aes(x = value, fill = dataset)) +
+    geom_histogram(bins = 30, color = "black") +
+    facet_wrap(~variable, scales = "free_x") +
+    scale_fill_manual(values = c("#0072B2", "#E69F00", "#009E73", "#D55E00")) +
+    theme_bw() +
+    labs(
+        title = "Species-level change in AOO",
+        x = "Log Ratio",
+        y = "Frequency"
+    ) +
+    facet_wrap(dataset ~ .)
+```
+
+:::
+
+## Relationships between variables
+
+The feature plots show how the variables for each hypothesis are related to each other and to the response variable. We can see that some relationships follow distinct patterns which suggests a correlation between variables. We will check this more specifically below and remove any variables that are correlated more than a certain threshold.
+
+::: panel-tabset
+## Feature plot: H1
+
+
+```{r}
+#| label: feature-plot-H1
+#| fig.width: 8
+#| fig.height: 12
+
+featurePlot(x = dat_J1 %>% select(dataset, all_of(H1_vars)),
+    y = dat_J1$Jaccard,
+    group = dat_J1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species traits (H1) - Jaccard 1",
+    par.settings =
+        list(fontsize = list(text = 4)))
+
+featurePlot(x = dat_J2 %>% select(dataset, all_of(H1_vars)),
+    y = dat_J2$Jaccard,
+    group = dat_J2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species traits (H1) - Jaccard 2",
+    par.settings =
+        list(fontsize = list(text = 4)))
+
+featurePlot(x = dat_LR1 %>% select(dataset, all_of(H1_vars)),
+    y = dat_LR1$log_R2_1,
+    group = dat_LR1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species traits (H1) - Log ratio 1",
+    par.settings =
+        list(fontsize = list(text = 4)))
+
+featurePlot(x = dat_LR2 %>% select(dataset, all_of(H1_vars)),
+    y = dat_LR2$log_R2_1,
+    group = dat_LR2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species traits (H1) - log Ratio 2",
+    par.settings =
+        list(fontsize = list(text = 4)))
+```
+
+
+## Feature plot: H2
+
+
+```{r}
+#| label: feature-plot-H2
+#| fig.width: 8
+#| fig.height: 12
+
+
+featurePlot(x = dat_J1 %>% select(dataset, all_of(H2_vars)),
+    y = dat_J1$Jaccard,
+    group = dat_J1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species geometry (H2) - Jaccard 1",
+    par.settings =
+        list(fontsize = list(text = 4)))
+
+featurePlot(x = dat_J2 %>% select(dataset, all_of(H2_vars)),
+    y = dat_J2$Jaccard,
+    group = dat_J2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species geometry (H2) - Jaccard 2",
+    par.settings =
+        list(fontsize = list(text = 4)))
+
+featurePlot(x = dat_LR1 %>% select(dataset, all_of(H2_vars)),
+    y = dat_LR1$log_R2_1,
+    group = dat_LR1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species geometry (H2) - log Ratio 1",
+    par.settings =
+        list(fontsize = list(text = 4)))
+
+featurePlot(x = dat_LR2 %>% select(dataset, all_of(H2_vars)),
+    y = dat_LR2$log_R2_1,
+    group = dat_LR2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.2,
+    xlab = "Scatterplot Matrix of species geometry (H2) - log Ratio 2",
+    par.settings =
+        list(fontsize = list(text = 4)))
+```
+
+
+## Feature plot: H3
+
+
+```{r}
+#| label: feature-plot-H3
+#| fig.width: 8
+#| fig.height: 12
+
+featurePlot(x = dat_J1 %>% select(dataset, all_of(H3_vars)),
+    y = dat_J1$Jaccard,
+    group = dat_J1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of diversity metrics (H3) - Jaccard 1",
+    par.settings =
+        list(fontsize = list(text = 6)))
+
+featurePlot(x = dat_J2 %>% select(dataset, all_of(H3_vars)),
+    y = dat_J2$Jaccard,
+    group = dat_J2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of diversity metrics (H3) - Jaccard 2",
+    par.settings =
+        list(fontsize = list(text = 6)))
+
+featurePlot(x = dat_LR1 %>% select(dataset, all_of(H3_vars)),
+    y = dat_LR1$log_R2_1,
+    group = dat_LR1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of diversity metrics (H3) - log Ratio 1",
+    par.settings =
+        list(fontsize = list(text = 6)))
+
+featurePlot(x = dat_LR2 %>% select(dataset, all_of(H3_vars)),
+    y = dat_LR2$log_R2_1,
+    group = dat_LR2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.3,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of diversity metrics (H3) - log Ratio 1",
+    par.settings =
+        list(fontsize = list(text = 6)))
+
+```
+
+
+## Feature plot: H4
+
+
+```{r}
+#| label: feature-plot-H4
+#| fig.width: 8
+#| fig.height: 12
+
+featurePlot(x = dat_J1 %>% select(dataset, all_of(H4_vars)),
+    y = dat_J1$Jaccard,
+    group = dat_J1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.6,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of atlas specifics (H4) - Jaccard 2",
+    par.settings =
+        list(fontsize = list(text = 5)))
+
+featurePlot(x = dat_J2 %>% select(dataset, all_of(H4_vars)),
+    y = dat_J2$Jaccard,
+    group = dat_J2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.6,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of atlas specifics (H4) - Jaccard 2",
+    par.settings =
+        list(fontsize = list(text = 5)))
+
+featurePlot(x = dat_LR1 %>% select(dataset, all_of(H4_vars)),
+    y = dat_LR1$log_R2_1,
+    group = dat_LR1$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.6,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of atlas specifics (H4) - log Ratio 1",
+    par.settings =
+        list(fontsize = list(text = 5)))
+
+featurePlot(x = dat_LR2 %>% select(dataset, all_of(H4_vars)),
+    y = dat_LR2$log_R2_1,
+    group = dat_LR2$dataset,
+    plot = "pairs",
+    pch = 16,
+    alpha = 0.6,
+    cex = 0.5,
+    xlab = "Scatterplot Matrix of atlas specifics (H4) - log Ratio 2",
+    par.settings =
+        list(fontsize = list(text = 5)))
+```
+
+:::
+
+## Correlation Matrix
+
+Next, we will check how correlated the predictors are. Those will be excluded using recipes below in Chapter: *Model fitting \> Data pre-processing*
+
+Those variables are:
+
+-   Jaccard tp 1 (n = 17)
+
+```         
+ [1] "maxDist_toBorder_centr"  "atlas_lengthMinRect"     "mean_cell_length"        "maxDist_toBorder_border"  [5] "mean_area"               "atlas_circ"              "atlas_elonMinRect"       "Total_area_samp"          [9] "GammaSR"                 "atlas_bearing"           "lengthMinRect"           "rel_ewDist"              [13] "rel_nsDist"              "AtlasCOG_lat"            "rel_circNorm"            "AtlasCOG_long"           [17] "atlas_bearingMinRect"  
+```
+
+-   Jaccard tp 2 (n = 18)
+
+```         
+ [1] "atlas_lengthMinRect"     "maxDist_toBorder_centr"  "mean_cell_length"        "maxDist_toBorder_border"  [5] "mean_area"               "atlas_circ"              "atlas_elonMinRect"       "Total_area_samp"          [9] "GammaSR"                 "atlas_bearing"           "lengthMinRect"           "rel_ewDist"              [13] "rel_nsDist"              "AtlasCOG_lat"            "rel_circNorm"            "AtlasCOG_long"           [17] "mean_prob_cooccur"       "atlas_bearingMinRect" 
+```
+
+-   log Ratio 1 (n = 17)
+
+```         
+[1] "maxDist_toBorder_centr"  "atlas_lengthMinRect"     "mean_cell_length"        "maxDist_toBorder_border"  [5] "mean_area"               "atlas_circ"              "atlas_elonMinRect"       "Total_area_samp"          [9] "GammaSR"                 "atlas_bearing"           "lengthMinRect"           "rel_ewDist"              [13] "rel_nsDist"              "AtlasCOG_lat"            "rel_circNorm"            "AtlasCOG_long"           [17] "atlas_bearingMinRect"   
+```
+
+-   log Ratio 2 (n = 17)
+
+```         
+ [1] "maxDist_toBorder_centr"  "atlas_lengthMinRect"     "mean_cell_length"        "maxDist_toBorder_border"  [5] "mean_area"               "atlas_circ"              "atlas_elonMinRect"       "Total_area_samp"          [9] "GammaSR"                 "atlas_bearing"           "lengthMinRect"           "rel_ewDist"              [13] "rel_nsDist"              "AtlasCOG_lat"            "rel_circNorm"            "AtlasCOG_long"           [17] "atlas_bearingMinRect"
+```
+
+::: panel-tabset
+## corr Jaccard 1
+
+
+```{r}
+#| label: correlation-matrix-J1
+#| fig.width: 30
+#| fig.height: 30
+
+cor_df <- dat_J1 %>% select(-Jaccard)
+p.mat <- model.matrix(~ 0 + ., data = cor_df) %>%
+    cor_pmat()
+
+correlation_matrix <- cor_df %>%
+    select_if(is.numeric) %>%
+    cor(use = "pairwise.complete.obs")
+correlation_matrix %>%
+    ggcorrplot(
+        hc.order = TRUE,
+        lab = TRUE,
+        lab_size = 3,
+        p.mat = p.mat,
+        insig = "blank"
+    )
+
+# We will set the threshold for excluding correlations = 0.85
+# this is a bit arbitrary, trying to find a good trade-off between loss of predictor variables and collinearity
+
+cor_vars <- findCorrelation(correlation_matrix,
+    cutoff = .85,
+    names = TRUE,
+    exact = TRUE,
+    verbose = FALSE)
+
+# cor_vars # 17 variables seemed to be highly correlated. We will exclude
+
+```
+
+
+## corr Jaccard 2
+
+
+```{r}
+#| label: correlation-matrix-J2
+#| fig.width: 30
+#| fig.height: 30
+
+cor_df <- dat_J2 %>% select(-Jaccard)
+p.mat <- model.matrix(~ 0 + ., data = cor_df) %>%
+    cor_pmat()
+
+correlation_matrix <- cor_df %>%
+    select_if(is.numeric) %>%
+    cor(use = "pairwise.complete.obs")
+correlation_matrix %>%
+    ggcorrplot(
+        hc.order = TRUE,
+        lab = TRUE,
+        lab_size = 3,
+        p.mat = p.mat,
+        insig = "blank"
+    )
+
+# We will set the threshold for excluding correlations = 0.85
+# this is a bit arbitrary, trying to find a good trade-off between loss of predictor variables and collinearity
+
+cor_vars <- findCorrelation(correlation_matrix,
+    cutoff = .85,
+    names = TRUE,
+    exact = TRUE,
+    verbose = FALSE)
+
+# cor_vars # 18 variables seemed to be highly correlated. We will exclude
+
+```
+
+
+## corr log ratio 1
+
+
+```{r}
+#| label: correlation-matrix-LR1
+#| fig.width: 30
+#| fig.height: 30
+
+cor_df <- dat_LR1 %>% select(-log_R2_1)
+p.mat <- model.matrix(~ 0 + ., data = cor_df) %>%
+    cor_pmat()
+
+correlation_matrix <- cor_df %>%
+    select_if(is.numeric) %>%
+    cor(use = "pairwise.complete.obs")
+correlation_matrix %>%
+    ggcorrplot(
+        hc.order = TRUE,
+        lab = TRUE,
+        lab_size = 3,
+        p.mat = p.mat,
+        insig = "blank"
+    )
+
+# We will set the threshold for excluding correlations = 0.85
+# this is a bit arbitrary, trying to find a good trade-off between loss of predictor variables and collinearity
+
+cor_vars <- findCorrelation(correlation_matrix,
+    cutoff = .85,
+    names = TRUE,
+    exact = TRUE,
+    verbose = FALSE)
+
+# cor_vars # 17 variables seemed to be highly correlated. We will exclude
+
+```
+
+
+## corr log ratio 2
+
+
+```{r}
+#| label: correlation-matrix-LR2
+#| fig.width: 30
+#| fig.height: 30
+
+cor_df <- dat_LR2 %>% select(-log_R2_1)
+p.mat <- model.matrix(~ 0 + ., data = cor_df) %>%
+    cor_pmat()
+
+correlation_matrix <- cor_df %>%
+    select_if(is.numeric) %>%
+    cor(use = "pairwise.complete.obs")
+correlation_matrix %>%
+    ggcorrplot(
+        hc.order = TRUE,
+        lab = TRUE,
+        lab_size = 3,
+        p.mat = p.mat,
+        insig = "blank"
+    )
+
+# We will set the threshold for excluding correlations = 0.85
+# this is a bit arbitrary, trying to find a good trade-off between loss of predictor variables and collinearity
+
+cor_vars <- findCorrelation(correlation_matrix,
+    cutoff = .85,
+    names = TRUE,
+    exact = TRUE,
+    verbose = FALSE)
+
+# cor_vars # 17 variables seemed to be highly correlated. We will exclude
+
+```
+
+:::
+
+# Model fitting
+
+We will be using the following models for comparative reasons:
+
+1.  Random Forest (`ranger`)
+2.  Extreme Gradient Boosting (`xgboost`)
+3.  Boosted Regression trees (`gbm`)
+
+In addition, we will fit an ensemble model and compare it's predictive performance to the individual models. All of this can be done in `caret` and `caretEnsemble.`
+
+### Data pre-processing:
+
+-   First we have to check if there are (near) zero variance variables in the predictors. These can be removed since they will not explain a lot generally.
+
+
+```{r}
+#| label: recipe-pre-processing-nzv
+
+# Step 1. Near Zero Vars
+rbind(
+nearZeroVar(dat_J1, saveMetrics = T) %>% filter(nzv == T),
+nearZeroVar(dat_J2, saveMetrics = T) %>% filter(nzv == T),
+nearZeroVar(dat_LR1, saveMetrics = T) %>% filter(nzv == T),
+nearZeroVar(dat_LR2, saveMetrics = T) %>% filter(nzv == T)) %>% 
+  kableExtra::kable()
+
+# only IUCN, but this is an important predictor (!) we will keep it.
+
+```
+
+
+-   Second, we will exclude all correlated variables with pearson's pairwise correlations coefficients r \> 0.85.
+
+-   Third, we will impute NA values based on knn-imputation with 5 neighbors (default). We will do all steps at once using `recipes.`
+
+-   We could have included the Near Zero Variable check in the recipe as well, however I wanted to have more control about which variables should be included. In this case, the near zero variance predictor `IUCN status` should be included into the model that assesses the risk of a species to undergo change.
+
+::: panel-tabset
+## Jaccard - sampling period 1
+
+
+```{r}
+#| label: recipe-pre-processing-recipe-J1
+
+# Step 2 & 3: imputing missing values & removing highly correlated variables
+recipe_pp_J1 <- recipe(Jaccard ~ .,
+    data = dat_J1) %>%
+    step_corr(all_numeric_predictors(), threshold = .85) %>%
+    step_impute_knn(all_predictors())
+
+# Estimate recipe on data:
+recipe_pp_prepped_J1 <- prep(recipe_pp_J1, dat_J1)
+
+# Removed columns:
+recipe_pp_prepped_J1$steps[[1]]$removals
+
+# apply the recipe to the data:
+dat_J1_v2 <- bake(recipe_pp_prepped_J1, dat_J1)
+```
+
+
+## Jaccard - sampling period 2
+
+
+```{r}
+#| label: recipe-pre-processing-recipe-J2
+
+# Step 2 & 3: imputing missing values & removing highly correlated variables
+recipe_pp_J2 <- recipe(Jaccard ~ .,
+    data = dat_J2) %>%
+    step_corr(all_numeric_predictors(), threshold = .85) %>%
+    step_impute_knn(all_predictors())
+
+# Estimate recipe on data:
+recipe_pp_prepped_J2 <- prep(recipe_pp_J2, dat_J2)
+
+# Removed columns:
+recipe_pp_prepped_J2$steps[[1]]$removals
+
+# apply the recipe to the data:
+dat_J2_v2 <- bake(recipe_pp_prepped_J2, dat_J2)
+```
+
+
+## Log Ratio - sampling period 1
+
+
+```{r}
+#| label: recipe-pre-processing-recipe-LR1
+
+# Step 2 & 3: imputing missing values & removing highly correlated variables
+recipe_pp_LR1 <- recipe(log_R2_1 ~ .,
+    data = dat_LR1) %>%
+    step_corr(all_numeric_predictors(), threshold = .85) %>%
+    step_impute_knn(all_predictors())
+
+# Estimate recipe on data:
+recipe_pp_prepped_LR1 <- prep(recipe_pp_LR1, dat_LR1)
+
+# Removed columns:
+recipe_pp_prepped_LR1$steps[[1]]$removals
+
+# apply the recipe to the data:
+dat_LR1_v2 <- bake(recipe_pp_prepped_LR1, dat_LR1)
+```
+
+
+## Log Ratio - sampling period 2
+
+
+```{r}
+#| label: recipe-pre-processing-recipe-LR2
+
+# Step 2 & 3: imputing missing values & removing highly correlated variables
+recipe_pp_LR2 <- recipe(log_R2_1 ~ .,
+    data = dat_LR2) %>%
+    step_corr(all_numeric_predictors(), threshold = .85) %>%
+    step_impute_knn(all_predictors())
+
+# Estimate recipe on data:
+recipe_pp_prepped_LR2 <- prep(recipe_pp_LR2, dat_LR2)
+
+# Removed columns:
+recipe_pp_prepped_LR2$steps[[1]]$removals
+
+# apply the recipe to the data:
+dat_LR2_v2 <- bake(recipe_pp_prepped_LR2, dat_LR2)
+```
+
+:::
+
+### Training & Validation sets:
+
+::: panel-tabset
+## Jaccard - Sampling Period 1
+
+
+```{r}
+set.seed(42)
+# Initial split to training and validation set (for final evaluation, keep dat_test completely out of the training sets)
+index_J1 <- createDataPartition(dat_J1_v2$Jaccard, p = 0.8, 1, list = FALSE)
+
+dat_train_J1 <- dat_J1_v2[index_J1, ]
+dat_test_J1 <- dat_J1_v2[-index_J1, ]
+
+# Cross-validation resampling indices 
+indices_J1 <- createDataPartition(dat_train_J1$Jaccard, p = 0.8, 10) # 10 resamples
+```
+
+
+## Jaccard - Sampling Period 2
+
+
+```{r}
+set.seed(42)
+# Initial split to training and validation set (for final evaluation, keep dat_test completely out of the training sets)
+index_J2 <- createDataPartition(dat_J2_v2$Jaccard, p = 0.8, 1, list = FALSE)
+
+dat_train_J2 <- dat_J2_v2[index_J2, ]
+dat_test_J2 <- dat_J2_v2[-index_J2, ]
+
+# Cross-validation resampling indices 
+indices_J2 <- createDataPartition(dat_train_J2$Jaccard, p = 0.8, 10) # 10 resamples
+```
+
+
+## Log Ratio - Sampling Period 1
+
+
+```{r}
+set.seed(42)
+# Initial split to training and validation set (for final evaluation, keep dat_test completely out of the training sets)
+index_LR1 <- createDataPartition(dat_LR1_v2$log_R2_1, p = 0.8, 1, list = FALSE)
+
+dat_train_LR1 <- dat_LR1_v2[index_LR1, ]
+dat_test_LR1 <- dat_LR1_v2[-index_LR1, ]
+
+# Cross-validation resampling indices 
+indices_LR1 <- createDataPartition(dat_train_LR1$log_R2_1, p = 0.8, 10) # 10 resamples
+```
+
+
+## Log Ratio - Sampling Period 2
+
+
+```{r}
+set.seed(42)
+# Initial split to training and validation set (for final evaluation, keep dat_test completely out of the training sets)
+index_LR2 <- createDataPartition(dat_LR2_v2$log_R2_1, p = 0.8, 1, list = FALSE)
+
+dat_train_LR2 <- dat_LR2_v2[index_LR2, ]
+dat_test_LR2 <- dat_LR2_v2[-index_LR2, ]
+
+# Cross-validation resampling indices 
+indices_LR2 <- createDataPartition(dat_train_LR2$log_R2_1, p = 0.8, 10) # 10 resamples
+```
+
+:::
+
+
+```{r}
+save.image("../data/RData/01_Data_prep.RData")
+``` 
+

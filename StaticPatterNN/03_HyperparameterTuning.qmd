@@ -1,0 +1,184 @@
+---
+title: "03 - Hyperparameter Tuning"
+author: 
+  - name: "MSc. Friederike Johanna Rosa Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "https://friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: "2023-05-29"
+format: 
+  html:
+    toc: true
+    code-fold: true
+    code-overflow: wrap
+    bibliography: references.bib
+keep-tex: true
+---
+
+::: panel-tabset
+## Source custom functions
+
+```{r}
+#| label: load-packages
+#| message: FALSE
+#| warning: FALSE
+rm(list = ls())
+source("../src/functions.R")
+
+```
+
+## MachineLearning packages
+
+```{r}
+#| label: load-ML-packages
+#| message: FALSE
+#| error: FALSE
+
+pckgs <- c("dplyr", "ggplot2", "reshape2", 
+           "ggcorrplot", 
+           "caret",  "recipes",   "caretEnsemble", 
+           "randomForest", "ranger", "gbm", "xgboost", 
+           "vegan", "pdp", 
+           "gridExtra", "kableExtra")
+
+install_and_load(pckgs)
+```
+
+## Load RData to reduce computing time
+
+```{r}
+#| label: load-RData
+#| message: FALSE
+#| error: FALSE
+
+# Load workspace to save computing time:
+## it has: varPart from ranger models
+## recursive feature selection results
+
+# load("data/varPart_rfe.RData")
+# load("data/models.RData")
+load("../data/RData/01_Data_prep.RData")
+```
+:::
+
+### Individual models
+
+#### Hyperparameter tuning
+
+```{r}
+#| label: hyperparameter-tuning
+
+
+
+
+index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
+dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
+
+saved_models <- replicate(4, list())
+names(saved_models) <- c("J1", "J2", "LR1", "LR2")
+
+
+response_list <- c("Jaccard", "Jaccard", "log_R2_1", "log_R2_1")
+
+for(j in seq_along(1:4)){
+  ## Loop through differet datasets/Analyses
+  indices <- index_list[[j]]
+  dat_train <- dat_train_list[[j]]
+  response <- response_list[[j]] 
+  
+  # Define training control ==========================================================
+  trainControl <- trainControl(
+    method = "repeatedcv",
+    number = 10,
+    repeats = 3,
+    savePredictions = "final",
+    returnResamp = "all",
+    verboseIter = FALSE,
+    index = indices)
+
+  ## Train ranger model ==========================================================
+  set.seed(42)
+  tictoc::tic("ranger")
+  rangerModel_t <- train(
+    as.formula(paste(response, "~ .")),
+    data = dat_train,
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 1000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 20)
+  
+  saveRDS(rangerModel_t, paste0("../data/rangerModel_", response, j, "all.rds"))
+  tictoc::toc()
+  
+  # rangerModel_t <- readRDS( paste0("../data/rangerModel_", response, j, "all.rds"))
+
+  ### Model results:
+  p_rangerModel <- plot(rangerModel_t)
+  p_rangerModel
+  rangerModel_t$finalModel
+
+  ## Train xgbTree model ==========================================================
+  xgb_grid <- expand.grid(
+    nrounds = c(1000),
+    eta = c(0.1, 0.3),
+    max_depth = c(2,3, 5),
+    gamma = c(0, 0.01, 0.1),
+    colsample_bytree = 0.6,
+    min_child_weight = 1,
+    subsample =1)
+  
+  tictoc::tic("xgb")
+  set.seed(42)
+  xgbModel_t <- train(
+    as.formula(paste(response, "~ .")),
+    data = dat_train,
+    method = "xgbTree",
+    trControl = trainControl,
+    tuneGrid = xgb_grid)
+  saveRDS(xgbModel_t, paste0("../data/xgbModel_all_", response, j, "TLCUSTOM.rds"))
+  tictoc::toc()
+  
+  # xgbModel_t <- readRDS(paste0("../data/xgbModel_all_", response, j, "TLCUSTOM.rds"))
+
+  ### Model results:
+  p_xgbModel <- plot(xgbModel_t)
+  p_xgbModel
+  slice_min(xgbModel_t$results, RMSE)
+  slice_max(xgbModel_t$results, Rsquared)
+
+  
+  ## Train gbm model ==========================================================
+  set.seed(42)
+  tictoc::tic("gbm")
+  gbmModel_t <- train(
+    as.formula(paste(response, "~ .")),
+    data = dat_train,
+    method = "gbm",
+    trControl = trainControl,
+    tuneLength= 20,
+    verbose = FALSE)
+  saveRDS(gbmModel_t, paste0("../data/gbmModel_", response, j, "all.rds"))
+  tictoc::toc()
+
+  # gbmModel_t <- readRDS(paste0("../data/gbmModel_", response, j, "all.rds")))
+
+
+  ### Model results:
+  summary.gbm(gbmModel_t$finalModel)
+  p_gbmModel <- plot(gbmModel_t)
+  p_gbmModel
+  gbmModel_t$finalModel
+  slice_min(gbmModel_t$results, RMSE)
+  slice_max(gbmModel_t$results, Rsquared)
+  
+  saved_models[[j]] <- list(rangerModel_t, xgbModel_t, gbmModel_t)
+}
+
+  save.image("../data/RData/hyper_para_tuning.RData")
+```
+
