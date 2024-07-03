@@ -35,7 +35,7 @@ source("../src/functions.R")
 #| message: FALSE
 #| error: FALSE
 
-pckgs <- c("dplyr", "reshape2", 
+pckgs <- c("dplyr", "reshape2", "tictoc", 
            "caret",  "recipes",   "caretEnsemble", 
            "randomForest", "ranger", "gbm", "xgboost")
 
@@ -99,7 +99,7 @@ rangerModel_t <- train(
    oob.error = TRUE,
    tuneLength = 20)
  
-saveRDS(rangerModel_t, paste0("../data/rds/rangerModel_", response, j, "_all.rds"))
+saveRDS(rangerModel_t, paste0("../data/models/03_rangerModel_", response, j, "_all.rds"))
 tictoc::toc()
   
 ## Train xgbTree model ==========================================================
@@ -121,7 +121,7 @@ xgbModel_t <- train(
   trControl = trainControl,
   tuneGrid = xgb_grid)
 
-saveRDS(xgbModel_t, paste0("../data/rds/xgbModel_all_", response, j, "_TLCUSTOM.rds"))
+saveRDS(xgbModel_t, paste0("../data/models/03_xgbModel_all", response, j, "_TLCUSTOM.rds"))
 tictoc::toc()
   
 ## Train gbm model ==========================================================
@@ -135,13 +135,13 @@ gbmModel_t <- train(
   tuneLength= 20,
   verbose = FALSE)
 
-saveRDS(gbmModel_t, paste0("../data/rds/gbmModel_", response, j, "_all.rds"))
+saveRDS(gbmModel_t, paste0("../data/models/03_gbmModel_all", response, j, ".rds"))
 tictoc::toc()
   
 saved_models <- list(rangerModel_t, xgbModel_t, gbmModel_t)
 
-saveRDS(saved_models, paste0("../data/RData/hyper_para_tuning_", response, j, "_models_list.rds"))
-save.image(paste0("../data/RData/hyper_para_tuning_", response, j, ".RData"))
+saveRDS(saved_models, paste0("../data/models/03_hyper_para_tuning_", response, j, "_models_list.rds"))
+save.image(paste0("../data/RData/03_hyper_para_tuning_", response, j, ".RData"))
 
 ```
 

@@ -57,15 +57,15 @@ install_and_load(pckgs)
 
 # load("data/varPart_rfe.RData")
 # load("data/models.RData")
-# load("../data/RData/01_Data_prep.RData")
-load("../data/RData/02_rfe.RData")
+load("../data/RData/01_Data_prep.RData")
+#load("../data/RData/02_rfe.RData")
 ```
 :::
 
 ### Predictor importance / Recursive Feature Selection
 
 ```{r}
-#| eval: false
+#| eval: true
 #| label: rfe-loop
 
 
@@ -108,7 +108,7 @@ for(j in seq_along(1:4)){
   
   ## First run:
   set.seed(42)
-  rfProfile <- rfe(x, y, ntree = 1000, sizes = subsets, rfeControl = ctrl)
+  rfProfile <- rfe(x, y, ntree = 5000, sizes = subsets, rfeControl = ctrl)
   rfProfile
     
   # Most important predictors:
@@ -295,7 +295,7 @@ wide <- Imp_df %>%
                           var %in% H4_vars ~ "H4"))
 
 
-wide %>% write.csv("../data/csv/02_all_var_imp.csv")
+wide %>% write.csv("../data/csv/02_all_var_imp_5000.csv")
 wide %>% kableExtra::kable()
 ```
 
