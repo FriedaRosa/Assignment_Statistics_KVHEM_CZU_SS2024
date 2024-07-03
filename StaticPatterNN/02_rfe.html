@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.554">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="MSc. Friederike Johanna Rosa Wölke">
+<meta name="dcterms.date" content="2023-05-29">
+
+<title>MachineLearning - Script 2 - Recursive Feature Selection</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="02_rfe_files/libs/clipboard/clipboard.min.js"></script>
+<script src="02_rfe_files/libs/quarto-html/quarto.js"></script>
+<script src="02_rfe_files/libs/quarto-html/popper.min.js"></script>
+<script src="02_rfe_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="02_rfe_files/libs/quarto-html/anchor.min.js"></script>
+<link href="02_rfe_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="02_rfe_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="02_rfe_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="02_rfe_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="02_rfe_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#predictor-importance-recursive-feature-selection" id="toc-predictor-importance-recursive-feature-selection" class="nav-link active" data-scroll-target="#predictor-importance-recursive-feature-selection">Predictor importance / Recursive Feature Selection</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">MachineLearning - Script 2 - Recursive Feature Selection</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p><a href="https://friedarosa.github.io">MSc. Friederike Johanna Rosa Wölke</a> <a href="mailto:wolke@fzp.czu.cz" class="quarto-title-author-email"><i class="bi bi-envelope"></i></a> <a href="https://orcid.org/0000-0001-9034-4883" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">May 29, 2023</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" href="">Source custom functions</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false" href="">MachineLearning packages</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-3-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-3" role="tab" aria-controls="tabset-1-3" aria-selected="false" href="">Load RData to reduce computing time</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(<span class="at">list =</span> <span class="fu">ls</span>())</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"../src/functions.R"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>pckgs <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"dplyr"</span>, <span class="st">"ggplot2"</span>, <span class="st">"reshape2"</span>, </span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>           <span class="st">"ggcorrplot"</span>, </span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>           <span class="st">"caret"</span>,  <span class="st">"recipes"</span>,   <span class="st">"caretEnsemble"</span>, </span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>           <span class="st">"randomForest"</span>, </span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>           <span class="st">"gridExtra"</span>, <span class="st">"kableExtra"</span>, <span class="st">"tidyr"</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">install_and_load</span>(pckgs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div id="tabset-1-3" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-3-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Load workspace to save computing time:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="do">## it has: varPart from ranger models</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="do">## recursive feature selection results</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># load("data/varPart_rfe.RData")</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># load("data/models.RData")</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># load("../data/RData/01_Data_prep.RData")</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="st">"../data/RData/02_rfe.RData"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
+<section id="predictor-importance-recursive-feature-selection" class="level3">
+<h3 class="anchored" data-anchor-id="predictor-importance-recursive-feature-selection">Predictor importance / Recursive Feature Selection</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>index_list <span class="ot">&lt;-</span> <span class="fu">list</span>(indices_J1, indices_J2, indices_LR1, indices_LR2)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>dat_train_list <span class="ot">&lt;-</span> <span class="fu">list</span>(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>saved_profiles <span class="ot">&lt;-</span> <span class="fu">replicate</span>(<span class="dv">4</span>, <span class="fu">list</span>())</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># names(saved_profiles) &lt;- c("J1", "J2", "LR1", "LR2")</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>save_imp <span class="ot">&lt;-</span> <span class="fu">replicate</span>(<span class="dv">4</span>, <span class="fu">list</span>())</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># names(save_imp) &lt;- c("J1", "J2", "LR1", "LR2")</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>response_list <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Jaccard"</span>, <span class="st">"Jaccard"</span>, <span class="st">"log_R2_1"</span>, <span class="st">"log_R2_1"</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(j <span class="cf">in</span> <span class="fu">seq_along</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>)){</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Loop through differet datasets/Analyses</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  indices <span class="ot">&lt;-</span> index_list[[j]]</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  dat_train <span class="ot">&lt;-</span> dat_train_list[[j]]</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  response <span class="ot">&lt;-</span> response_list[[j]] </span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  saved_profiles[[j]] <span class="ot">&lt;-</span> <span class="fu">replicate</span>(<span class="dv">4</span>, <span class="fu">list</span>())</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  save_imp[[j]] <span class="ot">&lt;-</span> <span class="fu">replicate</span>(<span class="dv">4</span>, <span class="fu">list</span>())</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Recursive feature selection:</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  ctrl <span class="ot">&lt;-</span> <span class="fu">rfeControl</span>(</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">functions =</span> rfFuncs,</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">"repeatedcv"</span>,</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">number =</span> <span class="dv">10</span>,</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">repeats =</span> <span class="dv">3</span>,</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">returnResamp =</span> <span class="st">"all"</span>, <span class="co"># we need all resamples</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">verbose =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">index =</span> indices,</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">saveDetails =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>  ctrl<span class="sc">$</span>functions<span class="sc">$</span>rank <span class="ot">&lt;-</span> rank <span class="co">#adjust rank function</span></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  <span class="do">## Set variables for recursive feature elimination</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>  subsets <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">50</span>) <span class="co"># number of predictors in each run</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>  x <span class="ot">&lt;-</span> dat_train <span class="sc">%&gt;%</span> <span class="fu">select</span>(<span class="sc">!</span><span class="fu">all_of</span>(response))</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>  y <span class="ot">&lt;-</span> dat_train <span class="sc">%&gt;%</span> <span class="fu">pull</span>(response)</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>  <span class="do">## First run:</span></span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(<span class="dv">42</span>)</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>  rfProfile <span class="ot">&lt;-</span> <span class="fu">rfe</span>(x, y, <span class="at">sizes =</span> subsets, <span class="at">rfeControl =</span> ctrl, <span class="at">ntree =</span> <span class="dv">5000</span>)</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>  rfProfile</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Most important predictors:</span></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>  imp <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(rfProfile<span class="sc">$</span>fit<span class="sc">$</span>importance) <span class="sc">%&gt;%</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">round</span>(<span class="dv">3</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">select</span>(<span class="st">`</span><span class="at">%IncMSE</span><span class="st">`</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">mutate</span>(<span class="at">var =</span> <span class="fu">row.names</span>(.)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>                   <span class="fu">arrange</span>(<span class="fu">desc</span>(<span class="st">`</span><span class="at">%IncMSE</span><span class="st">`</span>))    </span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>  saved_profiles[[j]] <span class="ot">&lt;-</span> rfProfile</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>  save_imp[[j]] <span class="ot">&lt;-</span> imp</span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(saved_profiles, <span class="at">file =</span> <span class="st">"../data/02_rfe_saved_profiles_5000.rds"</span>)</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a><span class="fu">save.image</span>(<span class="at">file =</span> <span class="st">"../data/RData/02_rfe_5000.RData"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">replicate</span>(<span class="dv">4</span>, <span class="fu">list</span>())</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>)){</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        resamp_res <span class="ot">&lt;-</span> saved_profiles[[i]]</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>        res <span class="ot">&lt;-</span> <span class="fu">slice_min</span>(resamp_res<span class="sc">$</span>results, RMSE)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        results[[i]] <span class="ot">&lt;-</span> res</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(results) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"J1"</span>, <span class="st">"J2"</span>, <span class="st">"LR1"</span>, <span class="st">"LR2"</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>rfe_res <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, results)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>rfe_res<span class="sc">$</span>dd <span class="ot">&lt;-</span> <span class="fu">rownames</span>(rfe_res)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Bar plot: Nr. Vars selected for each analysis </span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> rfe_res, <span class="fu">aes</span>(<span class="at">x =</span> dd, <span class="at">y =</span> Variables)) <span class="sc">+</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"lightgrey"</span>) <span class="sc">+</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">data =</span> rfe_res <span class="sc">%&gt;%</span> <span class="fu">group_by</span>(dd) <span class="sc">%&gt;%</span> <span class="fu">summarize</span>(<span class="at">mean_Variables =</span> <span class="fu">mean</span>(Variables)), </span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(<span class="at">x =</span> dd, <span class="at">y =</span> mean_Variables), <span class="at">color =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Number of variables selected per analysis"</span>, <span class="at">y =</span> <span class="st">"Number of variables selected"</span>, <span class="at">x =</span> <span class="st">"Analysis"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_rfe_files/figure-html/rfe-results-eval-1.png" class="img-fluid figure-img" width="384"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Add mean importance across resamples to results</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">1</span>]]<span class="sc">$</span>variables <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">1</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">39</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Overall_mean_resamp =</span> <span class="fu">mean</span>(Overall)) <span class="sc">%&gt;%</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">hypo =</span> <span class="fu">case_when</span>(var <span class="sc">%in%</span> H1_vars <span class="sc">~</span> <span class="st">"H1"</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H2_vars <span class="sc">~</span> <span class="st">"H2"</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H3_vars <span class="sc">~</span> <span class="st">"H3"</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H4_vars <span class="sc">~</span> <span class="st">"H4"</span>))</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">2</span>]]<span class="sc">$</span>variables <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">2</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">38</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Overall_mean_resamp =</span> <span class="fu">mean</span>(Overall))<span class="sc">%&gt;%</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">hypo =</span> <span class="fu">case_when</span>(var <span class="sc">%in%</span> H1_vars <span class="sc">~</span> <span class="st">"H1"</span>,</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H2_vars <span class="sc">~</span> <span class="st">"H2"</span>,</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H3_vars <span class="sc">~</span> <span class="st">"H3"</span>,</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H4_vars <span class="sc">~</span> <span class="st">"H4"</span>))</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">3</span>]]<span class="sc">$</span>variables <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">3</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">39</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Overall_mean_resamp =</span> <span class="fu">mean</span>(Overall))<span class="sc">%&gt;%</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">hypo =</span> <span class="fu">case_when</span>(var <span class="sc">%in%</span> H1_vars <span class="sc">~</span> <span class="st">"H1"</span>,</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H2_vars <span class="sc">~</span> <span class="st">"H2"</span>,</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H3_vars <span class="sc">~</span> <span class="st">"H3"</span>,</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H4_vars <span class="sc">~</span> <span class="st">"H4"</span>))</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">4</span>]]<span class="sc">$</span>variables <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">4</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">38</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Overall_mean_resamp =</span> <span class="fu">mean</span>(Overall))<span class="sc">%&gt;%</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">hypo =</span> <span class="fu">case_when</span>(var <span class="sc">%in%</span> H1_vars <span class="sc">~</span> <span class="st">"H1"</span>,</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H2_vars <span class="sc">~</span> <span class="st">"H2"</span>,</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H3_vars <span class="sc">~</span> <span class="st">"H3"</span>,</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H4_vars <span class="sc">~</span> <span class="st">"H4"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true" href="">Jaccard</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false" href="">Log Ratio</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grid.arrange</span>(<span class="at">ncol=</span><span class="dv">2</span>,</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">1</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">39</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>()<span class="sc">+</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_rect</span>(<span class="fu">aes</span>(<span class="at">xmin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">xmax =</span> <span class="cn">Inf</span>, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="dv">39</span><span class="fl">-14.5</span>), <span class="at">fill =</span> <span class="st">"lightgray"</span>, <span class="at">alpha =</span> <span class="fl">0.9</span>) <span class="sc">+</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="fu">aes</span>(<span class="at">y =</span> <span class="fu">reorder</span>(var, Overall), <span class="at">x =</span> Overall, <span class="at">fill =</span> hypo ), <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> Overall_mean_resamp, <span class="at">y =</span> var), <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlim</span>(<span class="dv">0</span>,<span class="dv">40</span>)<span class="sc">+</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"#e66101"</span>, <span class="st">"#fdb863"</span>, <span class="st">"#b2abd2"</span>, <span class="st">"#5e3c99"</span>)) <span class="sc">+</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Variables by Importance: Jaccard tp = 1"</span>, <span class="at">x =</span> <span class="st">"Importance"</span>, <span class="at">y =</span> <span class="st">"Variable"</span>),</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">2</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">38</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>()<span class="sc">+</span></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_rect</span>(<span class="fu">aes</span>(<span class="at">xmin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">xmax =</span> <span class="cn">Inf</span>, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="dv">39</span><span class="fl">-15.5</span>), <span class="at">fill =</span> <span class="st">"lightgray"</span>, <span class="at">alpha =</span> <span class="fl">0.9</span>) <span class="sc">+</span></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="fu">aes</span>(<span class="at">y =</span> <span class="fu">reorder</span>(var, Overall), <span class="at">x =</span> Overall, <span class="at">fill =</span> hypo ))<span class="sc">+</span></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> Overall_mean_resamp, <span class="at">y =</span> var), <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlim</span>(<span class="dv">0</span>,<span class="dv">40</span>)<span class="sc">+</span></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"#e66101"</span>, <span class="st">"#fdb863"</span>, <span class="st">"#b2abd2"</span>, <span class="st">"#5e3c99"</span>)) <span class="sc">+</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Variables by Importance: Jaccard tp = 2"</span>, <span class="at">x =</span> <span class="st">"Importance"</span>, <span class="at">y =</span> <span class="st">"Variable"</span>)</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_rfe_files/figure-html/rfe-results-boxplot-j-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grid.arrange</span>(<span class="at">ncol=</span><span class="dv">2</span>,</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">3</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">39</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>()<span class="sc">+</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_rect</span>(<span class="fu">aes</span>(<span class="at">xmin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">xmax =</span> <span class="cn">Inf</span>, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="dv">39</span><span class="fl">-36.5</span>), <span class="at">fill =</span> <span class="st">"lightgray"</span>, <span class="at">alpha =</span> <span class="fl">0.9</span>) <span class="sc">+</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="fu">aes</span>(<span class="at">y =</span> <span class="fu">reorder</span>(var, Overall), <span class="at">x =</span> Overall, <span class="at">fill =</span> hypo ), <span class="at">show.legend =</span> <span class="cn">FALSE</span>)<span class="sc">+</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> Overall_mean_resamp, <span class="at">y =</span> var), <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlim</span>(<span class="dv">0</span>,<span class="dv">40</span>)<span class="sc">+</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"#e66101"</span>, <span class="st">"#fdb863"</span>, <span class="st">"#b2abd2"</span>, <span class="st">"#5e3c99"</span>)) <span class="sc">+</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Variables by Importance: log ratio tp = 1"</span>, <span class="at">x =</span> <span class="st">"Importance"</span>, <span class="at">y =</span> <span class="st">"Variable"</span>),</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">4</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> <span class="fu">filter</span>(Variables <span class="sc">==</span> <span class="dv">38</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>()<span class="sc">+</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_rect</span>(<span class="fu">aes</span>(<span class="at">xmin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">xmax =</span> <span class="cn">Inf</span>, <span class="at">ymin =</span> <span class="sc">-</span><span class="cn">Inf</span>, <span class="at">ymax =</span> <span class="dv">39</span><span class="fl">-34.5</span>), <span class="at">fill =</span> <span class="st">"lightgray"</span>, <span class="at">alpha =</span> <span class="fl">0.9</span>) <span class="sc">+</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_boxplot</span>(<span class="fu">aes</span>(<span class="at">y =</span> <span class="fu">reorder</span>(var, Overall), <span class="at">x =</span> Overall, <span class="at">fill =</span> hypo ))<span class="sc">+</span></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">x =</span> Overall_mean_resamp, <span class="at">y =</span> var), <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">alpha =</span> <span class="fl">0.4</span>)<span class="sc">+</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_classic</span>()<span class="sc">+</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlim</span>(<span class="dv">0</span>,<span class="dv">40</span>)<span class="sc">+</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"#e66101"</span>, <span class="st">"#fdb863"</span>, <span class="st">"#b2abd2"</span>, <span class="st">"#5e3c99"</span>)) <span class="sc">+</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Variables by Importance: log ratio tp = 2"</span>, <span class="at">x =</span> <span class="st">"Importance"</span>, <span class="at">y =</span> <span class="st">"Variable"</span>)</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_rfe_files/figure-html/rfe-results-boxplot-lr-1.png" class="img-fluid figure-img" width="960"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>Imp_list <span class="ot">&lt;-</span> <span class="fu">replicate</span>(<span class="dv">4</span>, <span class="fu">list</span>())</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>Imp_list[[<span class="dv">1</span>]] <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">1</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span> </span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(Overall_mean_resamp, var) <span class="sc">%&gt;%</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="st">"imp"</span> <span class="ot">=</span> <span class="st">"Overall_mean_resamp"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"J1"</span>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>Imp_list[[<span class="dv">2</span>]] <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">2</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(Overall_mean_resamp, var) <span class="sc">%&gt;%</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="st">"imp"</span> <span class="ot">=</span> <span class="st">"Overall_mean_resamp"</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"J2"</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>Imp_list[[<span class="dv">3</span>]] <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">3</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(Overall_mean_resamp, var) <span class="sc">%&gt;%</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="st">"imp"</span> <span class="ot">=</span> <span class="st">"Overall_mean_resamp"</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"LR1"</span>)</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>Imp_list[[<span class="dv">4</span>]] <span class="ot">&lt;-</span> saved_profiles[[<span class="dv">4</span>]]<span class="sc">$</span>variables <span class="sc">%&gt;%</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(Overall_mean_resamp, var) <span class="sc">%&gt;%</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="st">"imp"</span> <span class="ot">=</span> <span class="st">"Overall_mean_resamp"</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">model =</span> <span class="st">"LR2"</span>)</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>Imp_df <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, Imp_list)</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>wide <span class="ot">&lt;-</span> Imp_df <span class="sc">%&gt;%</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">pivot_wider</span>(<span class="at">names_from =</span> <span class="fu">c</span>(model), </span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>                     <span class="at">values_from =</span> imp, <span class="at">names_sep =</span> <span class="st">"_"</span>, </span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>                     <span class="at">values_fn =</span> mean) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(J1)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(var) <span class="sc">%&gt;%</span>  </span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">hypo =</span> <span class="fu">case_when</span>(var <span class="sc">%in%</span> H1_vars <span class="sc">~</span> <span class="st">"H1"</span>,</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H2_vars <span class="sc">~</span> <span class="st">"H2"</span>,</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H3_vars <span class="sc">~</span> <span class="st">"H3"</span>,</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>                          var <span class="sc">%in%</span> H4_vars <span class="sc">~</span> <span class="st">"H4"</span>))</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>wide <span class="sc">%&gt;%</span> <span class="fu">write.csv</span>(<span class="st">"../data/csv/02_all_var_imp.csv"</span>)</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>wide <span class="sc">%&gt;%</span> kableExtra<span class="sc">::</span><span class="fu">kable</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 31%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 6%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">var</th>
+<th style="text-align: right;">J1</th>
+<th style="text-align: right;">J2</th>
+<th style="text-align: right;">LR1</th>
+<th style="text-align: right;">LR2</th>
+<th style="text-align: left;">hypo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">moran</td>
+<td style="text-align: right;">26.4918933</td>
+<td style="text-align: right;">27.0119583</td>
+<td style="text-align: right;">7.4899090</td>
+<td style="text-align: right;">7.6125465</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">rel_occ_Ncells</td>
+<td style="text-align: right;">22.2217541</td>
+<td style="text-align: right;">26.7081454</td>
+<td style="text-align: right;">12.2765914</td>
+<td style="text-align: right;">12.1301922</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">AOO</td>
+<td style="text-align: right;">20.9828555</td>
+<td style="text-align: right;">20.0722162</td>
+<td style="text-align: right;">12.3284281</td>
+<td style="text-align: right;">10.7217707</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">D_AOO_a</td>
+<td style="text-align: right;">20.0552953</td>
+<td style="text-align: right;">18.8531992</td>
+<td style="text-align: right;">16.2854927</td>
+<td style="text-align: right;">11.2910944</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">circ</td>
+<td style="text-align: right;">19.3789749</td>
+<td style="text-align: right;">19.8479281</td>
+<td style="text-align: right;">8.2111299</td>
+<td style="text-align: right;">5.3542254</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">rel_relCirc</td>
+<td style="text-align: right;">18.9160238</td>
+<td style="text-align: right;">15.9754264</td>
+<td style="text-align: right;">9.8326860</td>
+<td style="text-align: right;">7.9159014</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">x_intercept</td>
+<td style="text-align: right;">14.3878461</td>
+<td style="text-align: right;">13.9867595</td>
+<td style="text-align: right;">7.2367509</td>
+<td style="text-align: right;">8.0679255</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">mean_prob_cooccur</td>
+<td style="text-align: right;">12.7803324</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: right;">12.3157144</td>
+<td style="text-align: right;">NA</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">sp_centr_lat</td>
+<td style="text-align: right;">11.5054191</td>
+<td style="text-align: right;">12.0437724</td>
+<td style="text-align: right;">8.3050526</td>
+<td style="text-align: right;">6.0829365</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GlobRangeSize_m2</td>
+<td style="text-align: right;">11.3038822</td>
+<td style="text-align: right;">8.3393796</td>
+<td style="text-align: right;">2.2852417</td>
+<td style="text-align: right;">4.4814057</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">BetaSR_sp</td>
+<td style="text-align: right;">10.7152491</td>
+<td style="text-align: right;">12.6585544</td>
+<td style="text-align: right;">8.5146091</td>
+<td style="text-align: right;">6.2818172</td>
+<td style="text-align: left;">H3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Dist_centroid_to_COG</td>
+<td style="text-align: right;">9.8704227</td>
+<td style="text-align: right;">12.4154940</td>
+<td style="text-align: right;">6.1197076</td>
+<td style="text-align: right;">6.3061542</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">sp_centr_lon</td>
+<td style="text-align: right;">9.4669353</td>
+<td style="text-align: right;">9.9056440</td>
+<td style="text-align: right;">8.6518387</td>
+<td style="text-align: right;">8.7339776</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Southernness</td>
+<td style="text-align: right;">8.7186726</td>
+<td style="text-align: right;">8.9235387</td>
+<td style="text-align: right;">9.9308127</td>
+<td style="text-align: right;">7.8905316</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">AlphaSR_sp</td>
+<td style="text-align: right;">7.6783160</td>
+<td style="text-align: right;">10.2281866</td>
+<td style="text-align: right;">12.7620988</td>
+<td style="text-align: right;">8.4709309</td>
+<td style="text-align: left;">H3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Westernness</td>
+<td style="text-align: right;">7.6113853</td>
+<td style="text-align: right;">10.2243244</td>
+<td style="text-align: right;">11.0208217</td>
+<td style="text-align: right;">9.7560169</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Trophic.Niche</td>
+<td style="text-align: right;">7.3281021</td>
+<td style="text-align: right;">6.9706154</td>
+<td style="text-align: right;">3.4531537</td>
+<td style="text-align: right;">2.6972510</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Habitat</td>
+<td style="text-align: right;">6.9045325</td>
+<td style="text-align: right;">7.9692927</td>
+<td style="text-align: right;">5.4422061</td>
+<td style="text-align: right;">3.2514836</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">widthMinRect</td>
+<td style="text-align: right;">6.7309560</td>
+<td style="text-align: right;">6.7115598</td>
+<td style="text-align: right;">10.0719938</td>
+<td style="text-align: right;">8.1562119</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">sd_PC2</td>
+<td style="text-align: right;">5.0834159</td>
+<td style="text-align: right;">5.5748376</td>
+<td style="text-align: right;">1.9969566</td>
+<td style="text-align: right;">2.8522692</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">dataset</td>
+<td style="text-align: right;">5.0799946</td>
+<td style="text-align: right;">5.1720916</td>
+<td style="text-align: right;">6.2407195</td>
+<td style="text-align: right;">3.0082021</td>
+<td style="text-align: left;">H4</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">rel_maxDist</td>
+<td style="text-align: right;">4.6518804</td>
+<td style="text-align: right;">5.7735025</td>
+<td style="text-align: right;">7.8781663</td>
+<td style="text-align: right;">7.2431499</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">bearingMinRect</td>
+<td style="text-align: right;">4.2368436</td>
+<td style="text-align: right;">4.4658936</td>
+<td style="text-align: right;">6.0392265</td>
+<td style="text-align: right;">4.8351465</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">minDist_toBorder_centr</td>
+<td style="text-align: right;">3.7850045</td>
+<td style="text-align: right;">6.0399565</td>
+<td style="text-align: right;">7.3050840</td>
+<td style="text-align: right;">6.1149645</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Hand.Wing.Index</td>
+<td style="text-align: right;">3.6511921</td>
+<td style="text-align: right;">4.5428183</td>
+<td style="text-align: right;">4.6225491</td>
+<td style="text-align: right;">3.3143162</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">sd_PC1</td>
+<td style="text-align: right;">3.6287347</td>
+<td style="text-align: right;">2.4727857</td>
+<td style="text-align: right;">3.2396831</td>
+<td style="text-align: right;">3.5941110</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">rel_lin</td>
+<td style="text-align: right;">3.5043104</td>
+<td style="text-align: right;">5.7051660</td>
+<td style="text-align: right;">7.5478376</td>
+<td style="text-align: right;">8.9954301</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">rel_elonRatio</td>
+<td style="text-align: right;">3.3277416</td>
+<td style="text-align: right;">4.8594032</td>
+<td style="text-align: right;">7.2411389</td>
+<td style="text-align: right;">6.4934161</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Mass</td>
+<td style="text-align: right;">3.1912387</td>
+<td style="text-align: right;">4.5460667</td>
+<td style="text-align: right;">9.3504056</td>
+<td style="text-align: right;">12.3954269</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">atlas_bearingMinRect</td>
+<td style="text-align: right;">3.1655936</td>
+<td style="text-align: right;">2.8926015</td>
+<td style="text-align: right;">2.3942589</td>
+<td style="text-align: right;">2.6957469</td>
+<td style="text-align: left;">H4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">bearing</td>
+<td style="text-align: right;">2.9826027</td>
+<td style="text-align: right;">5.6847656</td>
+<td style="text-align: right;">6.2731573</td>
+<td style="text-align: right;">8.5324495</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">atlas_widthMinRect</td>
+<td style="text-align: right;">2.5095201</td>
+<td style="text-align: right;">2.3594942</td>
+<td style="text-align: right;">2.0951256</td>
+<td style="text-align: right;">1.9185660</td>
+<td style="text-align: left;">H4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Primary.Lifestyle</td>
+<td style="text-align: right;">1.9245461</td>
+<td style="text-align: right;">2.2407401</td>
+<td style="text-align: right;">2.3934605</td>
+<td style="text-align: right;">0.4537456</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">elonMinRect</td>
+<td style="text-align: right;">1.7935771</td>
+<td style="text-align: right;">4.5260779</td>
+<td style="text-align: right;">3.5097829</td>
+<td style="text-align: right;">4.8606263</td>
+<td style="text-align: left;">H2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Habitat.Density</td>
+<td style="text-align: right;">1.6507370</td>
+<td style="text-align: right;">2.2392050</td>
+<td style="text-align: right;">1.9681833</td>
+<td style="text-align: right;">0.5166223</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">IUCN</td>
+<td style="text-align: right;">1.4901414</td>
+<td style="text-align: right;">-0.1588238</td>
+<td style="text-align: right;">3.7609340</td>
+<td style="text-align: right;">1.8651010</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Migration</td>
+<td style="text-align: right;">1.2719474</td>
+<td style="text-align: right;">1.7337458</td>
+<td style="text-align: right;">1.6349150</td>
+<td style="text-align: right;">1.8242623</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Trophic.Level</td>
+<td style="text-align: right;">0.7727833</td>
+<td style="text-align: right;">1.5303863</td>
+<td style="text-align: right;">-0.0552392</td>
+<td style="text-align: right;">1.3869064</td>
+<td style="text-align: left;">H1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">FP</td>
+<td style="text-align: right;">-0.5482478</td>
+<td style="text-align: right;">-0.7639280</td>
+<td style="text-align: right;">1.2687750</td>
+<td style="text-align: right;">2.6354625</td>
+<td style="text-align: left;">H1</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># On best models (best hyper parameters)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">1</span>]]<span class="sc">$</span>fit </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ randomForest(x = x, y = y, importance = TRUE, ntrees = 5000) 
+               Type of random forest: regression
+                     Number of trees: 500
+No. of variables tried at each split: 5
+
+          Mean of squared residuals: 0.01256344
+                    % Var explained: 84.26</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">1</span>]]<span class="sc">$</span>fit <span class="sc">%&gt;%</span> <span class="fu">varImp</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                      Overall
+moran                30.22557
+rel_occ_Ncells       23.93076
+AOO                  24.94051
+D_AOO_a              20.40517
+circ                 23.17735
+rel_relCirc          22.06362
+x_intercept          17.06229
+mean_prob_cooccur    14.21387
+sp_centr_lat         15.61192
+GlobRangeSize_m2     16.09031
+BetaSR_sp            12.87056
+Dist_centroid_to_COG 13.84536
+sp_centr_lon         15.55381
+Southernness         11.51501
+AlphaSR_sp           10.25721</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">2</span>]]<span class="sc">$</span>fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ randomForest(x = x, y = y, importance = TRUE, ntrees = 5000) 
+               Type of random forest: regression
+                     Number of trees: 500
+No. of variables tried at each split: 5
+
+          Mean of squared residuals: 0.01546202
+                    % Var explained: 80.52</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">2</span>]]<span class="sc">$</span>fit <span class="sc">%&gt;%</span> <span class="fu">varImp</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                      Overall
+moran                31.54404
+rel_occ_Ncells       30.38689
+AOO                  21.23292
+circ                 23.66748
+D_AOO_a              19.27401
+rel_relCirc          17.08920
+x_intercept          14.81628
+BetaSR_sp            20.60851
+Dist_centroid_to_COG 16.30925
+sp_centr_lat         17.94173
+AlphaSR_sp           15.25263
+Westernness          15.81308
+sp_centr_lon         12.22269
+Southernness         13.50705
+GlobRangeSize_m2     13.48740</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">3</span>]]<span class="sc">$</span>fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ randomForest(x = x, y = y, importance = TRUE, ntrees = 5000) 
+               Type of random forest: regression
+                     Number of trees: 500
+No. of variables tried at each split: 12
+
+          Mean of squared residuals: 0.2738408
+                    % Var explained: 13.76</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">3</span>]]<span class="sc">$</span>fit <span class="sc">%&gt;%</span> <span class="fu">varImp</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                          Overall
+D_AOO_a                16.4187544
+AlphaSR_sp             14.1984107
+mean_prob_cooccur      13.6455845
+AOO                    14.3721188
+rel_occ_Ncells         14.5885021
+Westernness            12.5469340
+widthMinRect           10.1899765
+Mass                    9.9939375
+Southernness           11.6551918
+rel_relCirc             8.9705758
+sp_centr_lon            9.6465359
+BetaSR_sp               9.4263411
+sp_centr_lat            8.2280592
+circ                    7.5775934
+rel_lin                 8.9225210
+rel_maxDist             7.5159648
+moran                   7.6712298
+minDist_toBorder_centr  9.4989411
+rel_elonRatio           7.1042026
+x_intercept             6.2975802
+bearing                 8.2176629
+dataset                 6.1468061
+bearingMinRect          8.3986052
+Dist_centroid_to_COG    7.0289088
+Habitat                 5.2811977
+Hand.Wing.Index         4.2506930
+IUCN                    4.0606278
+Trophic.Niche           2.4091256
+elonMinRect             5.2974686
+sd_PC1                  5.0142565
+Primary.Lifestyle       2.7140162
+GlobRangeSize_m2        2.8568688
+atlas_bearingMinRect    2.0593476
+sd_PC2                  0.4749406
+Habitat.Density         2.1445397
+atlas_widthMinRect      2.2732170
+Migration               3.0622642</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">4</span>]]<span class="sc">$</span>fit </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+ randomForest(x = x, y = y, importance = TRUE, ntrees = 5000) 
+               Type of random forest: regression
+                     Number of trees: 500
+No. of variables tried at each split: 11
+
+          Mean of squared residuals: 0.2652966
+                    % Var explained: 14.46</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>saved_profiles[[<span class="dv">4</span>]]<span class="sc">$</span>fit <span class="sc">%&gt;%</span> <span class="fu">varImp</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                         Overall
+Mass                   14.019392
+rel_occ_Ncells         14.035006
+D_AOO_a                11.428715
+AOO                    11.446122
+Westernness            10.853659
+rel_lin                10.272688
+sp_centr_lon           10.435908
+bearing                10.921826
+AlphaSR_sp              8.634171
+widthMinRect            8.932327
+x_intercept             9.695567
+rel_relCirc            10.512311
+Southernness           10.695232
+moran                   9.565624
+rel_maxDist             9.762578
+rel_elonRatio           5.969801
+Dist_centroid_to_COG    7.647571
+BetaSR_sp               6.547390
+minDist_toBorder_centr  8.901305
+sp_centr_lat            6.714105
+circ                    6.825578
+elonMinRect             6.712859
+bearingMinRect          7.846892
+GlobRangeSize_m2        4.253581
+sd_PC1                  5.588725
+Habitat                 3.374516
+Hand.Wing.Index         3.756840
+Trophic.Niche           2.257980
+sd_PC2                  2.792614
+dataset                 3.754815
+FP                      3.319687
+atlas_bearingMinRect    1.297490
+IUCN                    1.907787
+Migration               2.654225</code></pre>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

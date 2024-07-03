@@ -10,10 +10,9 @@ date: "2023-05-29"
 format: 
   html:
     toc: true
-    code-fold: true
     code-overflow: wrap
     bibliography: references.bib
-keep-tex: true
+    monofont: Cascadia Code
 ---
 
 ::: panel-tabset
@@ -109,10 +108,10 @@ for(j in seq_along(1:4)){
     oob.error = TRUE,
     tuneLength = 20)
   
-  saveRDS(rangerModel_t, paste0("../data/rangerModel_", response, j, "all.rds"))
+  saveRDS(rangerModel_t, paste0("../data/rds/rangerModel_", response, j, "all.rds"))
   tictoc::toc()
   
-  # rangerModel_t <- readRDS( paste0("../data/rangerModel_", response, j, "all.rds"))
+  # rangerModel_t <- readRDS( paste0("../data/rds/rangerModel_", response, j, "all.rds"))
 
   ### Model results:
   p_rangerModel <- plot(rangerModel_t)
@@ -137,10 +136,10 @@ for(j in seq_along(1:4)){
     method = "xgbTree",
     trControl = trainControl,
     tuneGrid = xgb_grid)
-  saveRDS(xgbModel_t, paste0("../data/xgbModel_all_", response, j, "TLCUSTOM.rds"))
+  saveRDS(xgbModel_t, paste0("../data/rds/xgbModel_all_", response, j, "TLCUSTOM.rds"))
   tictoc::toc()
   
-  # xgbModel_t <- readRDS(paste0("../data/xgbModel_all_", response, j, "TLCUSTOM.rds"))
+  # xgbModel_t <- readRDS(paste0("../data/rds/xgbModel_all_", response, j, "TLCUSTOM.rds"))
 
   ### Model results:
   p_xgbModel <- plot(xgbModel_t)
@@ -159,10 +158,10 @@ for(j in seq_along(1:4)){
     trControl = trainControl,
     tuneLength= 20,
     verbose = FALSE)
-  saveRDS(gbmModel_t, paste0("../data/gbmModel_", response, j, "all.rds"))
+  saveRDS(gbmModel_t, paste0("../data/rds/gbmModel_", response, j, "all.rds"))
   tictoc::toc()
 
-  # gbmModel_t <- readRDS(paste0("../data/gbmModel_", response, j, "all.rds")))
+  # gbmModel_t <- readRDS(paste0("../data/rds/gbmModel_", response, j, "all.rds")))
 
 
   ### Model results:
@@ -176,6 +175,54 @@ for(j in seq_along(1:4)){
   saved_models[[j]] <- list(rangerModel_t, xgbModel_t, gbmModel_t)
 }
 
-  save.image("../data/RData/hyper_para_tuning.RData")
+saveRDS(saved_models, "../data/rds/hyper_para_tuning_all_models.rds")
+save.image("../data/RData/hyper_para_tuning.RData")
 ```
 
+```{r}
+library(dplyr); library(caret); library(gbm)
+
+# Jaccard 1
+rangerM <- readRDS("../data/rds/03_rangerModel_Jaccard1all.rds")
+xgbM <- readRDS("../data/rds/03_xgbModel_all_Jaccard1TLCUSTOM.rds")
+gbmM <- readRDS("../data/rds/03_gbmModel_Jaccard1all.rds")
+
+
+rangerM$bestTune
+rangerM$finalModel$r.squared
+plot(rangerM) 
+plot(xgbM)
+xgbM
+
+xgbM$finalModel
+plot(gbmM)
+summary(gbmM)
+gbmM$fit %>% str()
+
+varImp(gbmM)
+varImp(rangerM) %>% str()
+varImp(xgbM, n = 68)
+
+
+
+summary.gbm(gbmM$finalModel, order = TRUE) %>% 
+  mutate(across(where(is.numeric), round, 3)) %>% 
+  left_join(all_importances) %>% 
+  ggplot(aes(x = rel.inf, y = Overall, col = var))+
+  geom_point()
+
+
+# Split importance between ALL predictors (n = 68, factors dummy coded)
+vimp <- caret::varImp(gbmM, type = 1, scale = TRUE)
+all_importances <- vimp$importance %>% arrange(desc(Overall)) %>% round(3)
+all_importances$var <- rownames(vimp$importance %>% arrange(desc(Overall)))
+avg_importance <-  
+
+if (is.factor(gbmM)) {
+   if (all(levels(y) %in% colnames(vimp))) {
+     avImp <- apply(vimp[, levels(y), drop = TRUE], 1, mean)
+     vimp$Overall <- avImp
+
+
+
+```

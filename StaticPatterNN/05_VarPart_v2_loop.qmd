@@ -10,10 +10,9 @@ date: "2023-05-29"
 format: 
   html:
     toc: true
-    code-fold: true
     code-overflow: wrap
     bibliography: references.bib
-keep-tex: true
+    monofont: Cascadia Code
 ---
 
 ::: panel-tabset
@@ -60,7 +59,8 @@ install_and_load(pckgs)
 
 # load("data/varPart_rfe.RData")
 # load("data/models.RData")
-load("../data/RData/01_Data_prep.RData")
+# load("../data/RData/01_Data_prep.RData")
+load("../data/RData/04_VarPart_loop.RData")
 ```
 :::
 
@@ -73,7 +73,7 @@ Now we will look which of the four hypotheses explains most variation in the res
 
 ```{r}
 #| label: var-part-rf-all
-
+#| eval: false
 
 index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
 dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
@@ -93,7 +93,7 @@ for(i in seq_along(1:4)){
     repeats = 3,
     savePredictions = "final",
     returnResamp = "final",
-    verboseIter = TRUE,
+    verboseIter = FALSE,
     index = index)
 
   tictoc::tic("ranger full model")
@@ -332,12 +332,13 @@ saveRDS(varPart_list, "../data/varPart_list_loop.rds")
 #| label: var-part-ranger-performance-eval
 # ===== Performance eval ======= #
 
-
-varPart_list <- replicate(4, list())
-
+performance <- list()
+performance_all <- list()
+plots <- list()
+dat_test_list <- list(dat_test_J1, dat_test_J2, dat_test_LR1, dat_test_LR2)
 for(i in seq_along(1:4)){
   
-  dat_test <- dat_train_list[[i]]
+  dat_test <- dat_test_list[[i]]
   index <- index_list[[i]]
   response <- response_list[[i]]
   models <- varPart_list[[i]]
@@ -389,6 +390,7 @@ model <- c("full",
             "H1H2", "H1H3", "H1H4", "H2H3", "H2H4", "H3H4", 
             "H1H2H3", "H1H2H4", "H1H3H4", "H2H3H4")
 perf$model <- model
+perf$subset <- paste0(response,"_", i)
 
 # Print the performance metrics
 
@@ -396,22 +398,29 @@ perf %>%
     kableExtra::kable()
 perf %>% 
     kableExtra::kable() %>% 
-    write.csv("../data/performance_varExpl_rf_loop.csv")
+    write.csv(paste0("../data/performance_varExpl_rf_loop_", response,"_",i, ".csv"))
 
-slice_min(perf, RMSE) %>% 
+performance[[i]] <- slice_min(perf, RMSE) %>% 
     slice_max(Rsquared)
 
+performance_all[[i]] <- perf
 
 # Create a bar plot of variance explained
-ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
+plots[[i]] <- ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
   geom_bar(stat = "identity") +
   labs(x = "Model", y = "Variance Explained") +
   theme_minimal()
+}
+
+do.call(rbind, performance) %>% kableExtra::kable()
+do.call(rbind, performance_all) %>% kableExtra::kable()
+
+plots
 
 ```
 :::
 
 
 ```{r}
-save.image("../data/RData/04_VarPart_loop.RData")
+# save.image("../data/RData/04_VarPart_loop.RData")
 ```

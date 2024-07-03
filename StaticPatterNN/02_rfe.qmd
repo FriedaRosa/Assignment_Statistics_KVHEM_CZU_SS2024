@@ -10,12 +10,10 @@ date: "2023-05-29"
 format: 
   html:
     toc: true
-    code-fold: true
     code-overflow: wrap
     bibliography: references.bib
-keep-tex: true
+    monofont: Cascadia Code
 ---
-
 
 ::: panel-tabset
 ## Source custom functions
@@ -25,6 +23,7 @@ keep-tex: true
 #| message: FALSE
 #| warning: FALSE
 rm(list = ls())
+
 source("../src/functions.R")
 
 ```
@@ -39,9 +38,8 @@ source("../src/functions.R")
 pckgs <- c("dplyr", "ggplot2", "reshape2", 
            "ggcorrplot", 
            "caret",  "recipes",   "caretEnsemble", 
-           "randomForest", "ranger", "gbm", "xgboost", 
-           "vegan", "pdp", 
-           "gridExtra", "kableExtra")
+           "randomForest", 
+           "gridExtra", "kableExtra", "tidyr")
 
 install_and_load(pckgs)
 ```
@@ -59,14 +57,17 @@ install_and_load(pckgs)
 
 # load("data/varPart_rfe.RData")
 # load("data/models.RData")
-load("../data/RData/01_Data_prep.RData")
+# load("../data/RData/01_Data_prep.RData")
+load("../data/RData/02_rfe.RData")
 ```
 :::
 
 ### Predictor importance / Recursive Feature Selection
 
 ```{r}
-#| eval = FALSE
+#| eval: false
+#| label: rfe-loop
+
 
 index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
 dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
@@ -83,8 +84,8 @@ for(j in seq_along(1:4)){
   indices <- index_list[[j]]
   dat_train <- dat_train_list[[j]]
   response <- response_list[[j]] 
-  saved_profiles[[j]] <- replicate(50, list())
-  save_imp[[j]] <- replicate(50, list())
+  saved_profiles[[j]] <- replicate(4, list())
+  save_imp[[j]] <- replicate(4, list())
   
   ## Recursive feature selection:
   set.seed(42)
@@ -107,7 +108,7 @@ for(j in seq_along(1:4)){
   
   ## First run:
   set.seed(42)
-  rfProfile <- rfe(x, y, sizes = subsets, rfeControl = ctrl, ntrees = 5000)
+  rfProfile <- rfe(x, y, ntree = 1000, sizes = subsets, rfeControl = ctrl)
   rfProfile
     
   # Most important predictors:
@@ -121,17 +122,16 @@ for(j in seq_along(1:4)){
   save_imp[[j]] <- imp
 }
 
-saveRDS(saved_profiles, file = "../data/02_rfe_saved_profiles.rds")
-save.image(file = "../data/RData/rfe.RData")
+saveRDS(saved_profiles, file = "../data/02_rfe_saved_profiles_5000.rds")
+save.image(file = "../data/RData/02_rfe_5000.RData")
 ```
 
 ```{r}
-#| label: rfe-results
-#| fig.height: 10
-#| fig.width: 8
-#
-
-load("../data/RData/rfe.RData")
+#| label: rfe-results-eval
+#| fig.height: 4
+#| fig.width: 4
+#| eval: true
+#| warning: false
 
 results <- replicate(4, list())
     for (i in seq_along(1:4)){
@@ -140,56 +140,185 @@ results <- replicate(4, list())
         results[[i]] <- res
     }
 
-
 names(results) <- c("J1", "J2", "LR1", "LR2")
-
 rfe_res <- do.call(rbind, results)
-rfe_res$dd <- c("J1", "J2", "LR1", "LR2")
+rfe_res$dd <- rownames(rfe_res)
+
+
+# Bar plot: Nr. Vars selected for each analysis 
 ggplot(data = rfe_res, aes(x = dd, y = Variables)) +
-    geom_col() +
+    geom_col(fill = "lightgrey") +
     geom_point(data = rfe_res %>% group_by(dd) %>% summarize(mean_Variables = mean(Variables)), 
     aes(x = dd, y = mean_Variables), color = "red") +
-    theme_bw()
-
-rfe_res %>% group_by(dd) %>% summarize(mean_Variables = mean(Variables)) # 25.4 for both
-rfe_res %>% group_by(dd) %>% summarize(median_Variables = median(Variables)) # 26 for default, 24 for simple. Let's go with the results for the default model: 26.
-
-res_top_vars <- list()
-for(i in seq_along(rfe_res)){
-
-res_top_vars[[i]] <- data.frame(
-    var = row.names(varImp(saved_profiles[[i]]$fit$importance, scale = T)),
-    Imp = varImp(saved_profiles[[i]])$Overall,
-    include = c(rep_len(1, as.numeric(saved_profiles[[i]]$bestSubset)), 
-                rep_len(0,  
-                length(row.names(varImp(saved_profiles[[i]], scale = T)))-as.numeric(saved_profiles[[i]]$bestSubset))
-            ),
-    model = i
-        )
-}
-
-res_top_vars_df <- do.call(rbind, res_top_vars)
+    theme_classic()+
+    labs(title = "Number of variables selected per analysis", y = "Number of variables selected", x = "Analysis")
 
 
+# Add mean importance across resamples to results
+saved_profiles[[1]]$variables <- saved_profiles[[1]]$variables %>% filter(Variables == 39) %>%
+  group_by(var) %>%
+  mutate(Overall_mean_resamp = mean(Overall)) %>%
+  mutate(hypo = case_when(var %in% H1_vars ~ "H1",
+                          var %in% H2_vars ~ "H2",
+                          var %in% H3_vars ~ "H3",
+                          var %in% H4_vars ~ "H4"))
 
-### Plot =====
+saved_profiles[[2]]$variables <- saved_profiles[[2]]$variables %>% filter(Variables == 38) %>%
+  group_by(var) %>%
+  mutate(Overall_mean_resamp = mean(Overall))%>%
+  mutate(hypo = case_when(var %in% H1_vars ~ "H1",
+                          var %in% H2_vars ~ "H2",
+                          var %in% H3_vars ~ "H3",
+                          var %in% H4_vars ~ "H4"))
 
-# Calculate the maximum count of resamples for scaling
-max_count <- res_top_vars_df %>% count(var) %>% pull(n) %>% max()
+saved_profiles[[3]]$variables <- saved_profiles[[3]]$variables %>% filter(Variables == 39) %>%
+  group_by(var) %>%
+  mutate(Overall_mean_resamp = mean(Overall))%>%
+  mutate(hypo = case_when(var %in% H1_vars ~ "H1",
+                          var %in% H2_vars ~ "H2",
+                          var %in% H3_vars ~ "H3",
+                          var %in% H4_vars ~ "H4"))
 
-ggplot(data = res_top_vars_df %>% filter(model == 1)) +
-  # Background rectangles
-  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 10.5), 
-            fill = "lightgray", alpha = 0.9) +
-  # Box plot
-  geom_col(aes(y = reorder(var, Imp), x = Imp)) +
-  # Horizontal line
-  geom_hline(yintercept = 10.5) +
-  # Scale and theme
-  scale_fill_manual(values = c("#D55E00", "#009E73")) +
-  theme_bw() +
-  theme(legend.position = "right") +
-  labs(title = "Top Variables by Importance", x = "Importance", y = "Variable")
+saved_profiles[[4]]$variables <- saved_profiles[[4]]$variables %>% filter(Variables == 38) %>%
+  group_by(var) %>%
+  mutate(Overall_mean_resamp = mean(Overall))%>%
+  mutate(hypo = case_when(var %in% H1_vars ~ "H1",
+                          var %in% H2_vars ~ "H2",
+                          var %in% H3_vars ~ "H3",
+                          var %in% H4_vars ~ "H4"))
+```
+
+::: panel-tabset
+## Jaccard
+
+```{r}
+#| label: rfe-results-boxplot-j
+#| fig.height: 8
+#| fig.width: 10
+#| eval: true
+#| warning: false
+
+
+grid.arrange(ncol=2,
+saved_profiles[[1]]$variables %>% filter(Variables == 39) %>%
+  group_by(var) %>%
+  ggplot()+
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-14.5), fill = "lightgray", alpha = 0.9) +
+  geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ), show.legend = FALSE)+
+  geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
+  theme_classic()+
+  xlim(0,40)+
+  scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
+  labs(title = "Variables by Importance: Jaccard tp = 1", x = "Importance", y = "Variable"),
+
+
+saved_profiles[[2]]$variables %>% filter(Variables == 38) %>%
+  group_by(var) %>%
+  ggplot()+
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-15.5), fill = "lightgray", alpha = 0.9) +
+  geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ))+
+  geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
+  theme_classic()+
+  xlim(0,40)+
+  scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
+  labs(title = "Variables by Importance: Jaccard tp = 2", x = "Importance", y = "Variable")
+)
+```
+
+## Log Ratio
+
+```{r}
+#| label: rfe-results-boxplot-lr
+#| fig.height: 8
+#| fig.width: 10
+#| eval: true
+#| warning: false
+
+
+grid.arrange(ncol=2,
+saved_profiles[[3]]$variables %>% filter(Variables == 39) %>%
+  group_by(var) %>%
+  ggplot()+
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-36.5), fill = "lightgray", alpha = 0.9) +
+  geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ), show.legend = FALSE)+
+  geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
+  theme_classic()+
+  xlim(0,40)+
+  scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
+  labs(title = "Variables by Importance: log ratio tp = 1", x = "Importance", y = "Variable"),
+
+saved_profiles[[4]]$variables %>% filter(Variables == 38) %>%
+  group_by(var) %>%
+  ggplot()+
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-34.5), fill = "lightgray", alpha = 0.9) +
+  geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ))+
+  geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
+  theme_classic()+
+  xlim(0,40)+
+  scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
+  labs(title = "Variables by Importance: log ratio tp = 2", x = "Importance", y = "Variable")
+)
+```
+:::
+
+```{r}
+Imp_list <- replicate(4, list())
+Imp_list[[1]] <- saved_profiles[[1]]$variables %>% 
+  select(Overall_mean_resamp, var) %>%
+  rename("imp" = "Overall_mean_resamp") %>%
+  mutate(model = "J1")
+Imp_list[[2]] <- saved_profiles[[2]]$variables %>%
+  select(Overall_mean_resamp, var) %>%
+  rename("imp" = "Overall_mean_resamp")%>%
+  mutate(model = "J2")
+
+Imp_list[[3]] <- saved_profiles[[3]]$variables %>%
+  select(Overall_mean_resamp, var) %>%
+  rename("imp" = "Overall_mean_resamp")%>%
+  mutate(model = "LR1")
+
+Imp_list[[4]] <- saved_profiles[[4]]$variables %>%
+  select(Overall_mean_resamp, var) %>%
+  rename("imp" = "Overall_mean_resamp")%>%
+  mutate(model = "LR2")
+
+Imp_df <- do.call(rbind, Imp_list)
+wide <- Imp_df %>%
+  tidyr::pivot_wider(names_from = c(model), 
+                     values_from = imp, names_sep = "_", 
+                     values_fn = mean) %>% 
+  arrange(desc(J1)) %>% 
+  group_by(var) %>%  
+  mutate(hypo = case_when(var %in% H1_vars ~ "H1",
+                          var %in% H2_vars ~ "H2",
+                          var %in% H3_vars ~ "H3",
+                          var %in% H4_vars ~ "H4"))
+
+
+wide %>% write.csv("../data/csv/02_all_var_imp.csv")
+wide %>% kableExtra::kable()
+```
+
+```{r}
+# On best models (best hyper parameters)
+saved_profiles[[1]]$fit 
+saved_profiles[[1]]$fit %>% varImp()
+
+
+
+saved_profiles[[2]]$fit
+saved_profiles[[2]]$fit %>% varImp()
+
+
+
+saved_profiles[[3]]$fit
+saved_profiles[[3]]$fit %>% varImp()
+
+
+
+saved_profiles[[4]]$fit 
+saved_profiles[[4]]$fit %>% varImp()
+
 
 
 ```

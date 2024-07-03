@@ -10,10 +10,9 @@ date: "2023-05-29"
 format: 
   html:
     toc: true
-    code-fold: true
     code-overflow: wrap
     bibliography: references.bib
-keep-tex: true
+    monofont: Cascadia Code
 ---
 
 ::: panel-tabset
@@ -151,7 +150,7 @@ anova.cca(rda(dat_train$Jaccard, H4_data)) # sign. p = 0.001
 ## Log Ratio - Sampling Period 1
 
 ```{r}
-#| label: var-part-vegan-J1
+#| label: var-part-vegan-LR1
 #| message: FALSE
 #| warning: FALSE
 #| error: FALSE
@@ -192,7 +191,7 @@ anova.cca(rda(dat_train$log_R2_1, H4_data)) # sign. p = 0.001
 ## Log Ratio - Sampling Period 2
 
 ```{r}
-#| label: var-part-vegan-J1
+#| label: var-part-vegan-LR2
 #| message: FALSE
 #| warning: FALSE
 #| error: FALSE
@@ -231,7 +230,7 @@ anova.cca(rda(dat_train$log_R2_1, H4_data)) # sign. p = 0.001
 run time at server: ca. 30 min
 
 ```{r}
-#| label: var-part-rf
+#| label: var-part-rf-J1
 #| eval: FALSE
 
 index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
@@ -477,7 +476,7 @@ saveRDS(J1_varPart_ranger_list, "../data/J1_varPart_list.rds")
 ```
 
 ```{r}
-#| label: var-part-ranger-performance-eval
+#| label: var-part-ranger-performance-eval-J1
 #| message: FALSE
 #| warning: FALSE
 #| error: FALSE
@@ -800,7 +799,7 @@ saveRDS(J2_varPart_ranger_list, "../data/J2_varPart_list.rds")
 ```
 
 ```{r}
-#| label: var-part-ranger-performance-eval
+#| label: var-part-ranger-performance-eval-J2
 # ===== Performance eval ======= #
 dat_test <- dat_test_J2
 J2_varPart_ranger_list <- readRDS("../data/J2_varPart_list.rds")
@@ -1116,7 +1115,7 @@ saveRDS(LR1_varPart_ranger_list, "../data/LR1_varPart_list.rds")
 ```
 
 ```{r}
-#| label: var-part-ranger-performance-eval
+#| label: var-part-ranger-performance-eval-LR1
 # ===== Performance eval ======= #
 dat_test <- dat_test_LR1
 LR1_varPart_ranger_list <- readRDS("../data/LR1_varPart_list.rds")
@@ -1435,7 +1434,7 @@ saveRDS(LR2_varPart_ranger_list, "../data/LR2_varPart_list.rds")
 ```
 
 ```{r}
-#| label: var-part-ranger-performance-eval
+#| label: var-part-ranger-performance-eval-LR2
 # ===== Performance eval ======= #
 dat_test <- dat_test_LR2
 LR2_varPart_ranger_list <- readRDS("../data/LR2_varPart_list.rds")
