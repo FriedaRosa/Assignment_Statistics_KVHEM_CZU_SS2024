@@ -13,7 +13,18 @@ format:
     code-overflow: wrap
     bibliography: references.bib
     monofont: Cascadia Code
+    theme: unity
 ---
+
+# Recursive feature elimination
+
+I will use recursive feature elimination to reduce the dimensionality of the data by removing variables that do not lead to an increase of model performance when included.
+I will apply this method, because most of my predictors were calculated from the same data and are thus not independent.
+Although checking for high correlations in one of the previous steps, any correlations between predictor variables may confuse the model during variation partitioning, as correlations make it impossible to discern which variable explains how much of the variation.
+This also reduces the probability of overfitting the model to the data as redundant features with correlated noise signals are removed.
+
+The method being used relies on the `randomForest` package to recursively eliminate one predictor after another from the model, calculate the variable importance, rank these, average the importance across resamples and comparing the fit across models with different subsets of the set of predictors.
+The workflow is set in the `caret` helper function `rfFuncs()`.
 
 ::: panel-tabset
 ## Source custom functions
@@ -55,17 +66,19 @@ install_and_load(pckgs)
 ## it has: varPart from ranger models
 ## recursive feature selection results
 
-# load("data/varPart_rfe.RData")
-# load("data/models.RData")
-load("../data/RData/01_Data_prep.RData")
-#load("../data/RData/02_rfe.RData")
+# load("../data/RData/01_Data_prep.RData")
+load("../data/RData/02_rfe_5000.RData")
 ```
 :::
 
 ### Predictor importance / Recursive Feature Selection
 
+We will set up a loop that runs through the four response variables that I am investigating.
+The models from which the variable importance is calculated are run for 5000 trees each across 10 resamples.
+Again I will be using 10-fold repeated cross-validation with 3 repeats to evaluate the performance of the models.
+
 ```{r}
-#| eval: true
+#| eval: false
 #| label: rfe-loop
 
 
@@ -133,6 +146,13 @@ save.image(file = "../data/RData/02_rfe_5000.RData")
 #| eval: true
 #| warning: false
 
+saved_profiles[[1]]$bestSubset
+saved_profiles[[2]]$bestSubset
+saved_profiles[[3]]$bestSubset
+saved_profiles[[4]]$bestSubset
+
+
+
 results <- replicate(4, list())
     for (i in seq_along(1:4)){
         resamp_res <- saved_profiles[[i]]
@@ -191,6 +211,22 @@ saved_profiles[[4]]$variables <- saved_profiles[[4]]$variables %>% filter(Variab
 ::: panel-tabset
 ## Jaccard
 
+The following plots show, that the data that can be used to predict Jaccard can be reduced enormously without losing predictive performance.
+
+For *`Jaccard1`* the
+
+-   reduced model yields: RMSE = 0.1116 and R² = 0.8450,
+
+-   while the full model yields: RMSE = 0.1118 and R² = 0.8455.
+
+showing even a slightly reduced RMSE compared to the full model.
+
+For Jaccard 2 the
+
+-   reduced model yields: RMSE = 0.1248 and R² = 0.8077,
+
+-   while the full model yields: RMSE = 0.1273 and R² = 0.8022.
+
 ```{r}
 #| label: rfe-results-boxplot-j
 #| fig.height: 8
@@ -198,16 +234,27 @@ saved_profiles[[4]]$variables <- saved_profiles[[4]]$variables %>% filter(Variab
 #| eval: true
 #| warning: false
 
+# On best models (best hyper parameters)
+saved_profiles[[1]]$fit 
+saved_profiles[[1]]$fit %>% varImp()
+plot(saved_profiles[[1]])
+
+
+saved_profiles[[2]]$fit
+saved_profiles[[2]]$fit %>% varImp()
+plot(saved_profiles[[2]])
+
+## Plot the importances
 
 grid.arrange(ncol=2,
 saved_profiles[[1]]$variables %>% filter(Variables == 39) %>%
   group_by(var) %>%
   ggplot()+
-  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-14.5), fill = "lightgray", alpha = 0.9) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = (39.5-saved_profiles[[1]]$bestSubset)), fill = "lightgray", alpha = 0.9) +
   geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ), show.legend = FALSE)+
   geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
   theme_classic()+
-  xlim(0,40)+
+  xlim(0,100)+
   scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
   labs(title = "Variables by Importance: Jaccard tp = 1", x = "Importance", y = "Variable"),
 
@@ -215,17 +262,20 @@ saved_profiles[[1]]$variables %>% filter(Variables == 39) %>%
 saved_profiles[[2]]$variables %>% filter(Variables == 38) %>%
   group_by(var) %>%
   ggplot()+
-  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-15.5), fill = "lightgray", alpha = 0.9) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = (39.5-saved_profiles[[2]]$bestSubset)), fill = "lightgray", alpha = 0.9) +
   geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ))+
   geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
   theme_classic()+
-  xlim(0,40)+
+  xlim(0,100)+
   scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
   labs(title = "Variables by Importance: Jaccard tp = 2", x = "Importance", y = "Variable")
 )
 ```
 
 ## Log Ratio
+
+For `log ratio of AOO,` we can see that we need more predictors than for `Jaccard` to predict it from the data.
+As expected before, the model performance is generally low (both R² = 0.147) and the models try to include more information to discern the relationship between predictors and the response that does not capture a big signal from temporal change.
 
 ```{r}
 #| label: rfe-results-boxplot-lr
@@ -234,27 +284,37 @@ saved_profiles[[2]]$variables %>% filter(Variables == 38) %>%
 #| eval: true
 #| warning: false
 
+# On best models (best hyper parameters)
+saved_profiles[[3]]$fit 
+saved_profiles[[3]]$fit %>% varImp()
+plot(saved_profiles[[3]])
+
+
+saved_profiles[[4]]$fit
+saved_profiles[[4]]$fit %>% varImp()
+plot(saved_profiles[[4]])
+
 
 grid.arrange(ncol=2,
 saved_profiles[[3]]$variables %>% filter(Variables == 39) %>%
   group_by(var) %>%
   ggplot()+
-  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-36.5), fill = "lightgray", alpha = 0.9) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = (39.5-saved_profiles[[3]]$bestSubset)), fill = "lightgray", alpha = 0.9) +
   geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ), show.legend = FALSE)+
   geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
   theme_classic()+
-  xlim(0,40)+
+  xlim(0,100)+
   scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
   labs(title = "Variables by Importance: log ratio tp = 1", x = "Importance", y = "Variable"),
 
 saved_profiles[[4]]$variables %>% filter(Variables == 38) %>%
   group_by(var) %>%
   ggplot()+
-  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 39-34.5), fill = "lightgray", alpha = 0.9) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = (39.5-saved_profiles[[4]]$bestSubset)), fill = "lightgray", alpha = 0.9) +
   geom_boxplot(aes(y = reorder(var, Overall), x = Overall, fill = hypo ))+
   geom_point(aes(x = Overall_mean_resamp, y = var), col = "red", alpha = 0.4)+
   theme_classic()+
-  xlim(0,40)+
+  xlim(0,100)+
   scale_fill_manual(values = c("#e66101", "#fdb863", "#b2abd2", "#5e3c99")) +
   labs(title = "Variables by Importance: log ratio tp = 2", x = "Importance", y = "Variable")
 )
@@ -282,6 +342,12 @@ Imp_list[[4]] <- saved_profiles[[4]]$variables %>%
   rename("imp" = "Overall_mean_resamp")%>%
   mutate(model = "LR2")
 
+# Included vars:
+J1_vars <- saved_profiles[[1]]$fit$importance
+J2_vars <- saved_profiles[[2]]$fit$importance
+LR1_vars <- saved_profiles[[3]]$fit$importance
+LR2_vars <- saved_profiles[[4]]$fit$importance
+
 Imp_df <- do.call(rbind, Imp_list)
 wide <- Imp_df %>%
   tidyr::pivot_wider(names_from = c(model), 
@@ -292,22 +358,21 @@ wide <- Imp_df %>%
   mutate(hypo = case_when(var %in% H1_vars ~ "H1",
                           var %in% H2_vars ~ "H2",
                           var %in% H3_vars ~ "H3",
-                          var %in% H4_vars ~ "H4"))
-
+                          var %in% H4_vars ~ "H4")) %>%
+  mutate(Include_J1 = case_when(var %in% c(row.names(J1_vars)) ~ 1, 
+         .default = 0), 
+         Include_J2 = case_when(var %in% c(row.names(J2_vars)) ~ 1, 
+         .default = 0),
+         Include_LR1 = case_when(var %in% c(row.names(LR1_vars)) ~ 1, 
+         .default = 0),
+         Include_LR2 = case_when(var %in% c(row.names(LR2_vars)) ~ 1, 
+         .default = 0))
 
 wide %>% write.csv("../data/csv/02_all_var_imp_5000.csv")
 wide %>% kableExtra::kable()
 ```
 
 ```{r}
-# On best models (best hyper parameters)
-saved_profiles[[1]]$fit 
-saved_profiles[[1]]$fit %>% varImp()
-
-
-
-saved_profiles[[2]]$fit
-saved_profiles[[2]]$fit %>% varImp()
 
 
 
