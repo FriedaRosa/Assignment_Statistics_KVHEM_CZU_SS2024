@@ -1,0 +1,528 @@
+---
+title: "Script 4b - Partial Plots"
+author: 
+  - name: "MSc. Friederike Johanna Rosa Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "https://friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: "2023-05-29"
+---
+
+::: panel-tabset
+## Source custom functions
+
+```{r}
+#| label: load-functions
+#| message: false
+#| warning: false
+rm(list = ls())
+source("src/functions.R")
+
+```
+
+## MachineLearning packages
+
+```{r}
+#| label: load-ML-packages
+#| message: false
+#| error: false
+
+pckgs <- c("dplyr", "ggplot2", "reshape2", 
+           "pdp", 
+           "gridExtra")
+
+install_and_load(pckgs)
+```
+
+## Load RData to reduce computing time
+
+```{r}
+#| label: load-RData
+#| message: false
+#| error: false
+
+# Load final workspace to save computing time:
+load("data/RData/04b_pdp.RData")
+
+```
+:::
+
+# Partial Dependence Plots
+
+::: panel-tabset
+## Jaccard 1
+
+```{r}
+#| label: set-variables-J1
+
+pp_list_ranger_J1 <- replicate(39, list())
+ranger <- all_models[["Jaccard1"]]$ranger
+
+pp_list_xgb_J1 <- replicate(39, list())
+xgb <- all_models[["Jaccard1"]]$xgb
+
+pp_list_gbm_J1 <- replicate(39, list())
+gbm <- all_models[["Jaccard1"]]$gbm
+
+
+
+dd <- dat_train_J1
+pred_vars <- names(ranger$trainingData)[-1]
+```
+
+```{r}
+#| label: calculate-partial-dependencies-J1
+#| eval: false
+
+# Get all partial dependencies ==================
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_ranger_J1[[var]] <- partial(
+        ranger,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_xgb_J1[[var]] <- partial(
+        xgb,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_gbm_J1[[var]] <- partial(
+        gbm,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+pp_list_J1 <- list(pp_list_ranger_J1, pp_list_xgb_J1, pp_list_gbm_J1)
+
+saveRDS(pp_list_J1, "data/rds/pdp_list_J1.rds")
+
+```
+
+```{r}
+#| fig.width: 18
+#| fig.height: 25
+#| label: partial-dependence-plots-J1
+
+# Plotting
+
+# Define the predictor names
+predictors <- pred_vars
+
+# Initialize an empty list to store the plots
+plots <- list()
+
+# Function to determine if a column is categorical
+is_categorical <- function(column) {
+  is.factor(column) || is.character(column)
+}
+
+# Loop through the indices and create plots
+for (i in seq_along(1:length(predictors))) {
+  predictor <- names(pp_list_J1[[1]][[i]])[1]
+  
+  if (is_categorical(dd[[predictor]])) {
+    # Create boxplot for categorical predictors
+    plots[[i]] <- ggplot() +
+      geom_boxplot(data = pp_list_J1[[1]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat)) +
+      geom_boxplot(data = pp_list_J1[[2]][[i]],
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dashed") +
+      geom_boxplot(data = pp_list_J1[[3]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Boxplots") +
+      theme_bw() +
+      ylim(0, 1)
+  } else {
+    # Create line plot for continuous predictors
+    plots[[i]] <- ggplot() +
+      geom_line(data = pp_list_J1[[1]][[i]], 
+                aes(x = .data[[predictor]], y = yhat)) +
+      geom_line(data = pp_list_J1[[2]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), 
+                linetype = "dashed") +
+      geom_line(data = pp_list_J1[[3]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), 
+                linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Plots") +
+      theme_bw() +
+      ylim(0, 1)
+  }
+}
+
+# Arrange the plots in a grid
+gridExtra::grid.arrange(grobs = plots, ncol = 4)
+
+```
+
+## Jaccard 2
+
+```{r}
+#| label: set-variables-J2
+pp_list_ranger_J2 <- replicate(15, list())
+ranger <- all_models[["Jaccard2"]]$ranger
+
+pp_list_xgb_J2 <- replicate(15, list())
+xgb <- all_models[["Jaccard2"]]$xgb
+
+pp_list_gbm_J2 <- replicate(15, list())
+gbm <- all_models[["Jaccard2"]]$gbm
+
+
+
+dd <- dat_train_J2
+pred_vars <- names(ranger$trainingData)[-1]
+```
+
+```{r}
+#| label: calculate-partial-dependencies-J2
+#| eval: false
+
+# Get all partial dependencies ==================
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_ranger_J2[[var]] <- partial(
+        ranger,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_xgb_J2[[var]] <- partial(
+        xgb,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_gbm_J2[[var]] <- partial(
+        gbm,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+pp_list_J2 <- list(pp_list_ranger_J2, pp_list_xgb_J2, pp_list_gbm_J2)
+
+saveRDS(pp_list_J2, "data/rds/pdp_list_J2.rds")
+
+```
+
+```{r}
+#| fig.width: 18
+#| fig.height: 25
+#| label: partial-dependence-plots-J2
+
+# Plotting
+
+# Define the predictor names
+predictors <- pred_vars
+
+# Initialize an empty list to store the plots
+plots <- list()
+
+# Function to determine if a column is categorical
+is_categorical <- function(column) {
+  is.factor(column) || is.character(column)
+}
+
+# Loop through the indices and create plots
+for (i in seq_along(1:length(predictors))) {
+  predictor <- names(pp_list_J2[[1]][[i]])[1]
+  
+  if (is_categorical(dd[[predictor]])) {
+    # Create boxplot for categorical predictors
+    plots[[i]] <- ggplot() +
+      geom_boxplot(data = pp_list_J2[[1]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat)) +
+      geom_boxplot(data = pp_list_J2[[2]][[i]],
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dashed") +
+      geom_boxplot(data = pp_list_J2[[3]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Boxplots") +
+      theme_bw() +
+      ylim(0, 1)
+  } else {
+    # Create line plot for continuous predictors
+    plots[[i]] <- ggplot() +
+      geom_line(data = pp_list_J2[[1]][[i]], 
+                aes(x = .data[[predictor]], y = yhat)) +
+      geom_line(data = pp_list_J2[[2]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), 
+                linetype = "dashed") +
+      geom_line(data = pp_list_J2[[3]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), 
+                linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Plots") +
+      theme_bw() +
+      ylim(0, 1)
+  }
+}
+
+# Arrange the plots in a grid
+gridExtra::grid.arrange(grobs = plots, ncol = 4)
+
+```
+
+## LogRatio 1
+
+```{r}
+#| label: set-variables-LR1
+pp_list_ranger_LR1 <- replicate(38, list())
+ranger <- all_models[["LogRatio1"]]$ranger
+
+pp_list_xgb_LR1 <- replicate(38, list())
+xgb <- all_models[["LogRatio1"]]$xgb
+
+pp_list_gbm_LR1 <- replicate(38, list())
+gbm <- all_models[["LogRatio1"]]$gbm
+
+
+
+dd <- dat_train_LR1
+pred_vars <- names(ranger$trainingData)[-1]
+```
+
+```{r}
+#| label: calcualte-partial-dependencies-LR1
+#| eval: false
+
+# Get all partial dependencies ==================
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_ranger_LR1[[var]] <- partial(
+        ranger,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_xgb_LR1[[var]] <- partial(
+        xgb,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_gbm_LR1[[var]] <- partial(
+        gbm,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+pp_list_LR1 <- list(pp_list_ranger_LR1, pp_list_xgb_LR1, pp_list_gbm_LR1)
+
+saveRDS(pp_list_LR1, "data/rds/pdp_list_LR1.rds")
+
+```
+
+```{r}
+#| fig.width: 18
+#| fig.height: 30
+#| label: partial-dependence-plots-LR1
+
+# Plotting
+
+# Define the predictor names
+predictors <- pred_vars
+
+# Initialize an empty list to store the plots
+plots <- list()
+
+# Function to determine if a column is categorical
+is_categorical <- function(column) {
+  is.factor(column) || is.character(column)
+}
+
+# Loop through the indices and create plots
+for (i in seq_along(1:length(predictors))) {
+  predictor <- names(pp_list_LR1[[1]][[i]])[1]
+  
+  if (is_categorical(dd[[predictor]])) {
+    # Create boxplot for categorical predictors
+    plots[[i]] <- ggplot() +
+      geom_boxplot(data = pp_list_LR1[[1]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat)) +
+      geom_boxplot(data = pp_list_LR1[[2]][[i]],
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dashed") +
+      geom_boxplot(data = pp_list_LR1[[3]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Boxplots") +
+      theme_bw() +
+      ylim(-2, 2)
+  } else {
+    # Create line plot for continuous predictors
+    plots[[i]] <- ggplot() +
+      geom_line(data = pp_list_LR1[[1]][[i]], 
+                aes(x = .data[[predictor]], y = yhat)) +
+      geom_line(data = pp_list_LR1[[2]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), 
+                linetype = "dashed") +
+      geom_line(data = pp_list_LR1[[3]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), 
+                linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Plots") +
+      theme_bw() +
+      ylim(-2, 2)
+  }
+}
+
+# Arrange the plots in a grid
+gridExtra::grid.arrange(grobs = plots, ncol = 4)
+
+```
+
+## LogRatio 2
+
+```{r}
+#| label: set-variables-LR2
+pp_list_ranger_LR2 <- replicate(33, list())
+ranger <- all_models[["LogRatio2"]]$ranger
+
+pp_list_xgb_LR2 <- replicate(33, list())
+xgb <- all_models[["LogRatio2"]]$xgb
+
+pp_list_gbm_LR2 <- replicate(33, list())
+gbm <- all_models[["LogRatio2"]]$gbm
+
+
+
+dd <- dat_train_LR2
+pred_vars <- names(ranger$trainingData)[-1]
+```
+
+```{r}
+#| label: calculate-partial-dependencies-LR2
+
+# Partial dependence plots
+# Get all partial dependencies ==================
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_ranger_LR2[[var]] <- partial(
+        ranger,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_xgb_LR2[[var]] <- partial(
+        xgb,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+
+for (var in seq_along(1:length(pred_vars))){
+    pred_var <- pred_vars[var]
+    pp_list_gbm_LR2[[var]] <- partial(
+        gbm,
+        pred.var = pred_var,
+        plot = FALSE)
+}
+
+pp_list_LR2 <- list(pp_list_ranger_LR2, pp_list_xgb_LR2, pp_list_gbm_LR2)
+
+saveRDS(pp_list_LR2, "data/rds/pdp_list_LR2.rds")
+
+```
+
+```{r}
+#| fig.width: 18
+#| fig.height: 30
+#| label: partial-dependence-plots-LR2
+
+# Plotting
+
+# Define the predictor names
+predictors <- pred_vars
+
+# Initialize an empty list to store the plots
+plots <- list()
+
+# Function to determine if a column is categorical
+is_categorical <- function(column) {
+  is.factor(column) || is.character(column)
+}
+
+# Loop through the indices and create plots
+for (i in seq_along(1:length(predictors))) {
+  predictor <- names(pp_list_LR2[[1]][[i]])[1]
+  
+  if (is_categorical(dd[[predictor]])) {
+    # Create boxplot for categorical predictors
+    plots[[i]] <- ggplot() +
+      geom_boxplot(data = pp_list_LR2[[1]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat)) +
+      geom_boxplot(data = pp_list_LR2[[2]][[i]],
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dashed") +
+      geom_boxplot(data = pp_list_LR2[[3]][[i]], 
+                   aes(x = .data[[predictor]], y = yhat), 
+                   linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Boxplots") +
+      theme_bw() +
+      ylim(-2, 2)
+  } else {
+    # Create line plot for continuous predictors
+    plots[[i]] <- ggplot() +
+      geom_line(data = pp_list_LR2[[1]][[i]], 
+                aes(x = .data[[predictor]], y = yhat)) +
+      geom_line(data = pp_list_LR2[[2]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), linetype = "dashed") +
+      geom_line(data = pp_list_LR2[[3]][[i]], 
+                aes(x = .data[[predictor]], y = yhat), linetype = "dotted") +
+      labs(x = paste(predictor), 
+           y = "Partial Dependence", 
+           title = "Partial Dependence Plots") +
+      theme_bw() +
+      ylim(-2, 2)
+  }
+}
+
+# Arrange the plots in a grid
+gridExtra::grid.arrange(grobs = plots, ncol = 4)
+
+```
+:::
