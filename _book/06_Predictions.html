@@ -9,7 +9,7 @@
 <meta name="author" content="MSc. Friederike Johanna Rosa Wölke">
 <meta name="dcterms.date" content="2023-06-29">
 
-<title>Assignment Statistics KVHEM CZU SS 2024 - 6&nbsp; Script 6 - Predictions</title>
+<title>Assignment Statistics KVHEM CZU SS 2024 - 7&nbsp; Script 6 - Predictions</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -123,7 +123,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./06_Predictions.html"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Script 6 - Predictions</span></a></li></ol></nav>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./06_Predictions.html"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Script 6 - Predictions</span></a></li></ol></nav>
         <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
         </a>
       <button type="button" class="btn quarto-search-button" aria-label="" onclick="window.quartoOpenSearch();">
@@ -200,14 +200,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="./04b_PartialDependencePlots.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Script 4b - Partial Plots</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="./05_VarPart_v2_loop.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Script 5 - Variation Partitioning</span></span></a>
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Script 5 - Variation Partitioning</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./06_Predictions.html" class="sidebar-item-text sidebar-link active">
- <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Script 6 - Predictions</span></span></a>
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Script 6 - Predictions</span></span></a>
   </div>
 </li>
         <li class="sidebar-item">
@@ -229,7 +235,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Script 6 - Predictions</span></h1>
+<h1 class="title"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Script 6 - Predictions</span></h1>
 </div>
 
 
@@ -262,54 +268,54 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(<span class="at">list=</span><span class="fu">ls</span>())</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"src/functions.R"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: caret</code></pre>
+<pre><code>Lade nötiges Paket: caret</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: ggplot2</code></pre>
+<pre><code>Lade nötiges Paket: ggplot2</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: lattice</code></pre>
+<pre><code>Lade nötiges Paket: lattice</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: caretEnsemble</code></pre>
+<pre><code>Lade nötiges Paket: caretEnsemble</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>
-Attaching package: 'caretEnsemble'</code></pre>
+Attache Paket: 'caretEnsemble'</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following object is masked from 'package:ggplot2':
+<pre><code>Das folgende Objekt ist maskiert 'package:ggplot2':
 
     autoplot</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: plyr</code></pre>
+<pre><code>Lade nötiges Paket: plyr</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: dplyr</code></pre>
+<pre><code>Lade nötiges Paket: dplyr</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>
-Attaching package: 'dplyr'</code></pre>
+Attache Paket: 'dplyr'</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following objects are masked from 'package:plyr':
+<pre><code>Die folgenden Objekte sind maskiert von 'package:plyr':
 
     arrange, count, desc, failwith, id, mutate, rename, summarise,
     summarize</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following objects are masked from 'package:stats':
+<pre><code>Die folgenden Objekte sind maskiert von 'package:stats':
 
     filter, lag</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following objects are masked from 'package:base':
+<pre><code>Die folgenden Objekte sind maskiert von 'package:base':
 
     intersect, setdiff, setequal, union</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: randomForest</code></pre>
+<pre><code>Lade nötiges Paket: randomForest</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>randomForest 4.7-1.1</code></pre>
@@ -319,39 +325,39 @@ Attaching package: 'dplyr'</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>
-Attaching package: 'randomForest'</code></pre>
+Attache Paket: 'randomForest'</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following object is masked from 'package:dplyr':
+<pre><code>Das folgende Objekt ist maskiert 'package:dplyr':
 
     combine</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following object is masked from 'package:ggplot2':
+<pre><code>Das folgende Objekt ist maskiert 'package:ggplot2':
 
     margin</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: recipes</code></pre>
+<pre><code>Lade nötiges Paket: recipes</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>
-Attaching package: 'recipes'</code></pre>
+Attache Paket: 'recipes'</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following object is masked from 'package:stats':
+<pre><code>Das folgende Objekt ist maskiert 'package:stats':
 
     step</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>Loading required package: kableExtra</code></pre>
+<pre><code>Lade nötiges Paket: kableExtra</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
 <pre><code>
-Attaching package: 'kableExtra'</code></pre>
+Attache Paket: 'kableExtra'</code></pre>
 </div>
 <div class="cell-output cell-output-stderr">
-<pre><code>The following object is masked from 'package:dplyr':
+<pre><code>Das folgende Objekt ist maskiert 'package:dplyr':
 
     group_rows</code></pre>
 </div>
@@ -837,7 +843,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
       <a href="./05_VarPart_v2_loop.html" class="pagination-link" aria-label="Script 5 - Variation Partitioning">
-        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Script 5 - Variation Partitioning</span></span>
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Script 5 - Variation Partitioning</span></span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">

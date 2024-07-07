@@ -16,6 +16,7 @@ book:
     - 02_rfe.qmd
     - 03_HyperparameterTuning.qmd
     - 04_FinalModels.qmd
+    - 04b_PartialDependencePlots.qmd
     - 05_VarPart_v2_loop.qmd
     - 06_Predictions.qmd
     - 07_references.qmd
@@ -28,6 +29,7 @@ format:
     toc: true
     code-overflow: wrap
     monofont: Cascadia Code
+    self_contained: true
 
 comments:
   hypothesis: true
