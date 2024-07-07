@@ -15,6 +15,7 @@ book:
     - 01_DataPrep.qmd
     - 02_rfe.qmd
     - 03_HyperparameterTuning.qmd
+    - 04_FinalModels.qmd
     - 05_VarPart.qmd
     - references.qmd
 
