@@ -51,6 +51,31 @@ install_and_load(pckgs)
 # load("data/varPart_rfe.RData")
 # load("data/models.RData")
 load("../data/RData/01_Data_prep.RData")
+reduced_predictors <- readRDS("../data/rds/selected_predictors_list.rds")
+
+
+H1_vars <- c(
+    "sd_PC1", "sd_PC2", # Climatic Niche Breadth
+    "GlobRangeSize_m2", "IUCN", "Mass", "Habitat", "Habitat.Density",
+    "Migration", "Trophic.Level", "Trophic.Niche", "Primary.Lifestyle",
+    "FP", # Phylogenetic Distinctness
+    "Hand.Wing.Index") # Measure of dispersal ability
+H2_vars <- c(
+    "AOO", "rel_occ_Ncells", "mean_prob_cooccur", "D_AOO_a", 
+    "moran", "x_intercept", "sp_centr_lon", "sp_centr_lat",
+    "lengthMinRect", "widthMinRect", "elonMinRect", "bearingMinRect",
+    "circ", "bearing", "Southernness", "Westernness",
+    "rel_maxDist", "rel_ewDist", "rel_nsDist", "rel_elonRatio",
+    "rel_relCirc", "rel_circNorm", "rel_lin", "Dist_centroid_to_COG",
+    "maxDist_toBorder_border", "maxDist_toBorder_centr",
+    "minDist_toBorder_centr")
+H3_vars <- c("GammaSR", "AlphaSR_sp", "BetaSR_sp")
+H4_vars <- c(
+    "dataset", "mean_area", "Total_area_samp", "Total_Ncells_samp",
+    "mean_cell_length", "atlas_lengthMinRect", "atlas_widthMinRect",
+    "atlas_elonMinRect", "atlas_circ", "atlas_bearingMinRect",
+    "atlas_bearing", "AtlasCOG_long", "AtlasCOG_lat")
+
 ```
 :::
 
@@ -60,7 +85,7 @@ load("../data/RData/01_Data_prep.RData")
 
 ```{r}
 #| label: hyperparameter-tuning
-#| eval: false
+#| eval: true
 
 index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
 dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
@@ -68,17 +93,18 @@ dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
 saved_models <- replicate(4, list())
 names(saved_models) <- c("J1", "J2", "LR1", "LR2")
 
-reduced_predictors <- list(
-  J1 = c()
-)
-
 response_list <- c("Jaccard", "Jaccard", "log_R2_1", "log_R2_1")
 
-for(j in seq_along(1:4)){
+for(j in c(4)){
   ## Loop through differet datasets/Analyses
   indices <- index_list[[j]]
-  dat_train <- dat_train_list[[j]]
   response <- response_list[[j]] 
+  predictors <- rownames(reduced_predictors[[j]])
+  
+  # Subset the data
+  dat_train <- dat_train_list[[j]] %>% 
+                    select(any_of(c(response,predictors)))
+
   
   # Define training control ==========================================================
   trainControl <- trainControl(
@@ -100,12 +126,12 @@ for(j in seq_along(1:4)){
     trControl = trainControl,
     importance = "permutation",
     scale.permutation.importance = TRUE,
-    num.trees = 1000,
+    num.trees = 5000,
     respect.unordered.factors = TRUE,
     oob.error = TRUE,
     tuneLength = 20)
   
-  saveRDS(rangerModel_t, paste0("../data/rds/rangerModel_", response, j, "all.rds"))
+  saveRDS(rangerModel_t, paste0("../data/rds/03_reduced_rangerModel_", response, j, "all.rds"))
   tictoc::toc()
   
   # rangerModel_t <- readRDS( paste0("../data/rds/rangerModel_", response, j, "all.rds"))
@@ -133,7 +159,7 @@ for(j in seq_along(1:4)){
     method = "xgbTree",
     trControl = trainControl,
     tuneGrid = xgb_grid)
-  saveRDS(xgbModel_t, paste0("../data/rds/xgbModel_all_", response, j, "TLCUSTOM.rds"))
+  saveRDS(xgbModel_t, paste0("../data/rds/03_reduced_xgbModel_all_", response, j, "TLCUSTOM.rds"))
   tictoc::toc()
   
   # xgbModel_t <- readRDS(paste0("../data/rds/xgbModel_all_", response, j, "TLCUSTOM.rds"))
@@ -155,11 +181,8 @@ for(j in seq_along(1:4)){
     trControl = trainControl,
     tuneLength= 20,
     verbose = FALSE)
-  saveRDS(gbmModel_t, paste0("../data/rds/gbmModel_", response, j, "all.rds"))
+  saveRDS(gbmModel_t, paste0("../data/rds/03_reduced_gbmModel_", response, j, "all.rds"))
   tictoc::toc()
-
-  # gbmModel_t <- readRDS(paste0("../data/rds/gbmModel_", response, j, "all.rds")))
-
 
   ### Model results:
   summary.gbm(gbmModel_t$finalModel)
@@ -172,31 +195,70 @@ for(j in seq_along(1:4)){
   saved_models[[j]] <- list(rangerModel_t, xgbModel_t, gbmModel_t)
 }
 
-saveRDS(saved_models, "../data/rds/hyper_para_tuning_all_models.rds")
-save.image("../data/RData/hyper_para_tuning.RData")
+
+#saved_models[[1]] %>% saveRDS("../data/models/03_reduced_J1_all_models.rds")
+
+saveRDS(saved_models, "../data/models/03_reduced_hyper_para_tuning_all_models.rds")
+save.image("../data/RData/03_reduced_hyper_para_tuning.RData")
+
 ```
+
+# Evaluation
 
 ::: panel-tabset
 ## Jaccard 1
 
 ```{r}
-
 # Jaccard 1
 rangerM <- readRDS("../data/models/03_rangerModel_Jaccard1all.rds")
 xgbM <- readRDS("../data/models/03_xgbModel_all_Jaccard1TLCUSTOM.rds")
 gbmM <- readRDS("../data/models/03_gbmModel_Jaccard1all.rds")
 
+## reduced:
+ranger_red <- readRDS("../data/rds/03_reduced_rangerModel_Jaccard1all.rds")
+xgb_red <- readRDS("../data/rds/03_reduced_xgbModel_all_Jaccard1TLCUSTOM.rds")
+gbm_red <- readRDS("../data/rds/03_reduced_gbmModel_Jaccard1all.rds")
 
+
+
+
+
+## Ranger =====
 rangerM$bestTune
+ranger_red$bestTune
+
 rangerM$finalModel$r.squared
+ranger_red$finalModel$r.squared
+
+ranger_red$finalModel
+ranger_red$results
 plot(rangerM) 
+plot(ranger_red)
+
+
+## XGB ======
 plot(xgbM)
+plot(xgb_red)
+
+xgb_red
 xgbM
 
-xgbM$finalModel
+xgb.Booster.complete(xgbM$finalModel)
+xgb.Booster.complete(xgb_red$finalModel)
+
+xgbM$results
+
+xgb_red$finalModel
+
+
+
+## GBM =====
 plot(gbmM)
+plot(gbm_red)
 
+gbm_red$results
 
+## Importance frame (wide format) ===
 cbind(
   varImp(rangerM)$importance %>% 
     round(2) %>% 
@@ -213,7 +275,49 @@ cbind(
     mutate(var_gbm = rownames(.)) %>% 
     arrange(desc(Overall)) %>% 
     rename("Imp_gbm" = "Overall")
-)
+)  %>% kableExtra::kable()
+
+
+
+
+
+
+## Importance frame (long format for plotting) ===
+importances <- full_join(
+  varImp(ranger_red)$importance %>% 
+    round(2) %>% 
+    mutate(variable = rownames(.),
+           model = "ranger") %>% 
+    arrange(desc(Overall)) %>% 
+    rename("Importance" = "Overall"),
+  summary.gbm(gbm_red$finalModel, plotit=FALSE) %>% 
+    mutate_if(is.numeric, round, 2) %>% 
+    mutate(variable = rownames(.),
+           model = "gbm") %>% 
+    arrange(desc(rel.inf)) %>% 
+    rename("Importance" = "rel.inf") %>% 
+    select(variable, model, Importance)) %>% 
+  full_join(varImp(xgb_red)$importance %>% 
+    round(2) %>% 
+    mutate(variable = rownames(.),
+           model = "xgb") %>% 
+    arrange(desc(Overall)) %>% 
+    rename("Importance" = "Overall")) %>%
+  mutate(hypothesis = case_when(variable %in% H1_vars ~ "H1",
+                                variable %in% H2_vars ~ "H2",
+                                variable %in% H3_vars ~ "H3",
+                                variable %in% H4_vars ~ "H4",
+                                .default = "H1"))
+
+
+# Plot variable importances across models:
+ggplot(data = importances, 
+       aes(y = variable, x = Importance, fill = hypothesis))+
+  geom_col()+
+  facet_grid(~model)+
+  theme_classic()+
+  scale_fill_manual(values = c("seagreen3", "mediumpurple", "darkorange", "gold"))
+
 
 
 ```
@@ -221,23 +325,54 @@ cbind(
 ## Jaccard 2
 
 ```{r}
-#| eval: false
+#| eval: true
 # Jaccard 2
 rangerM <- readRDS("../data/models/03_rangerModel_all_Jaccard2.rds")
-xgbM <- readRDS("../data/models/03_xgbModel_all_Jaccard2TLCUSTOM.rds")
-gbmM <- readRDS("../data/models/03_gbmModel_Jaccard2all.rds")
+xgbM <- readRDS("../data/models/03_xgbModel_all_Jaccard2_TLCUSTOM.rds")
+gbmM <- readRDS("../data/models/03_gbmModel_all_Jaccard2.rds")
+
+## reduced:
+ranger_red <- readRDS("../data/rds/03_reduced_rangerModel_Jaccard2all.rds")
+xgb_red <- readRDS("../data/rds/03_reduced_xgbModel_all_Jaccard2TLCUSTOM.rds")
+gbm_red <- readRDS("../data/rds/03_reduced_gbmModel_Jaccard2all.rds")
 
 
+
+
+
+## Ranger =====
 rangerM$bestTune
+ranger_red$bestTune
+ranger_red$results
 rangerM$finalModel$r.squared
+ranger_red$finalModel$r.squared
+
 plot(rangerM) 
+plot(ranger_red)
+
+
+## XGB ======
 plot(xgbM)
+plot(xgb_red)
+
+xgb_red$results
 xgbM
 
+xgb.Booster.complete(xgbM$finalModel)
+xgb.Booster.complete(xgb_red$finalModel)
+
 xgbM$finalModel
+xgb_red$finalModel
+
+
+
+## GBM =====
 plot(gbmM)
+plot(gbm_red)
+gbm_red
 
 
+## Importance frame (wide format) ===
 cbind(
   varImp(rangerM)$importance %>% 
     round(2) %>% 
@@ -254,7 +389,51 @@ cbind(
     mutate(var_gbm = rownames(.)) %>% 
     arrange(desc(Overall)) %>% 
     rename("Imp_gbm" = "Overall")
-)
+)  %>% kableExtra::kable()
+
+
+
+
+
+
+## Importance frame (long format for plotting) ===
+importances <- full_join(
+  varImp(ranger_red)$importance %>% 
+    round(2) %>% 
+    mutate(variable = rownames(.),
+           model = "ranger") %>% 
+    arrange(desc(Overall)) %>% 
+    rename("Importance" = "Overall"),
+  summary.gbm(gbm_red$finalModel, plotit=FALSE) %>% 
+    mutate_if(is.numeric, round, 2) %>% 
+    mutate(variable = rownames(.),
+           model = "gbm") %>% 
+    arrange(desc(rel.inf)) %>% 
+    rename("Importance" = "rel.inf") %>% 
+    select(variable, model, Importance)) %>% 
+  full_join(varImp(xgb_red)$importance %>% 
+    round(2) %>% 
+    mutate(variable = rownames(.),
+           model = "xgb") %>% 
+    arrange(desc(Overall)) %>% 
+    rename("Importance" = "Overall")) %>%
+  mutate(hypothesis = case_when(variable %in% H1_vars ~ "H1",
+                                variable %in% H2_vars ~ "H2",
+                                variable %in% H3_vars ~ "H3",
+                                variable %in% H4_vars ~ "H4",
+                                .default = "H1"))
+
+
+# Plot variable importances across models:
+ggplot(data = importances, 
+       aes(y = variable, x = Importance, fill = hypothesis))+
+  geom_col()+
+  facet_grid(~model)+
+  theme_classic()+
+  scale_fill_manual(values = c("seagreen3", "mediumpurple", "darkorange", "gold"))
+
+
+
 ```
 
 ## Log Ratio 1
