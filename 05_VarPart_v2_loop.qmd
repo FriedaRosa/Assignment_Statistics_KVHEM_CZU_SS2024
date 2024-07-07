@@ -1,0 +1,426 @@
+---
+title: "Script 5 - Variation Partitioning"
+author: 
+  - name: "MSc. Friederike Johanna Rosa Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "https://friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: "2023-05-29"
+format: 
+  html:
+    toc: true
+    code-overflow: wrap
+    bibliography: references.bib
+    monofont: Cascadia Code
+---
+
+::: panel-tabset
+## Source: Custom Functions
+
+```{r}
+#| label: load-packages
+#| message: FALSE
+#| warning: FALSE
+
+rm(list = ls())
+#setwd("StaticPatterNN/")
+source("src/functions.R")
+
+```
+
+## Machine Learning Packages
+
+```{r}
+#| label: load-ML-packages
+#| message: FALSE
+#| error: FALSE
+
+pckgs <- c("dplyr", "ggplot2", "reshape2", 
+           "ggcorrplot", 
+           "caret",  "recipes",   "caretEnsemble", 
+           "randomForest", "ranger", "gbm", "xgboost", 
+           "vegan", "pdp", 
+           "gridExtra", "kableExtra")
+
+install_and_load(pckgs)
+```
+
+## Load RData to reduce computing time
+
+```{r}
+#| label: load-RData
+#| message: FALSE
+#| error: FALSE
+
+# Load workspace to save computing time:
+## it has: varPart from ranger models
+## recursive feature selection results
+
+# load("data/varPart_rfe.RData")
+# load("data/models.RData")
+# load("data/RData/01_Data_prep.RData")
+load("data/RData/05_VarPart_loop.RData")
+```
+:::
+
+### Variation Partitioning between Hypotheses
+
+Now we will look which of the four hypotheses explains most variation in the response.
+
+::: panel-tabset
+## Variation Partitioning - ranger loops (Jaccard & log Ratio)
+
+```{r}
+#| label: var-part-rf-all
+#| eval: false
+
+index_list <- list(indices_J1, indices_J2, indices_LR1, indices_LR2)
+dat_train_list <- list(dat_train_J1, dat_train_J2, dat_train_LR1, dat_train_LR2)
+response_list <- c("Jaccard", "Jaccard", "log_R2_1", "log_R2_1")
+
+varPart_list <- replicate(4, list())
+
+for(i in seq_along(1:4)){
+  
+  dat_train <- dat_train_list[[i]]
+  index <- index_list[[i]]
+  response <- response_list[[i]]
+
+  trainControl <- trainControl(
+    method = "repeatedcv",
+    number = 10,
+    repeats = 3,
+    savePredictions = "final",
+    returnResamp = "final",
+    verboseIter = FALSE,
+    index = index)
+
+  tictoc::tic("ranger full model")
+  set.seed(42)
+  full_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train,
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+tictoc::toc()
+
+
+# Train ranger model
+tictoc::tic("ranger H1")
+set.seed(42)
+H1_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(H1_vars)),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+tictoc::toc()
+
+
+tictoc::tic("ranger H2")
+set.seed(42)
+H2_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(H2_vars)),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+tictoc::toc()
+
+
+tictoc::tic("ranger H3")
+set.seed(42)
+H3_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(H3_vars)),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+tictoc::toc()
+
+tictoc::tic("ranger H4")
+set.seed(42)
+H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(H4_vars)),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+tictoc::toc()
+
+
+### combinations of 2 hypotheses:
+
+set.seed(42)
+H1H2_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H2_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+set.seed(42)
+H1H3_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H3_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+set.seed(42)
+H1H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H4_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+
+set.seed(42)
+H2H3_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H2_vars, H3_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+
+set.seed(42)
+H2H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H2_vars, H4_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+set.seed(42)
+H3H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H3_vars, H4_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+
+### combinations of 3 hypotheses together =====
+
+set.seed(42)
+H1H2H3_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H2_vars, H3_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+set.seed(42)
+H1H2H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H2_vars, H4_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+set.seed(42)
+H1H3H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H3_vars, H4_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+set.seed(42)
+H2H3H4_model <- train(
+    as.formula(paste0(response, "~ .")),
+    data = dat_train %>% select(response, any_of(c(H1_vars, H2_vars, H3_vars))),
+    method = "ranger",
+    trControl = trainControl,
+    importance = "permutation",
+    scale.permutation.importance = TRUE,
+    num.trees = 5000,
+    respect.unordered.factors = TRUE,
+    oob.error = TRUE,
+    tuneLength = 5)
+
+varPart_list[[i]] <- list(
+    full_model, H1_model, H2_model, H3_model, H4_model, 
+    H1H2_model, H1H3_model, H1H4_model, 
+    H2H3_model, H2H4_model, 
+    H3H4_model, 
+    H1H2H3_model, H1H2H4_model, H1H3H4_model, 
+    H2H3H4_model)
+}
+
+saveRDS(varPart_list, "data/varPart_list_loop.rds")
+
+```
+:::
+
+
+```{r}
+#| label: var-part-ranger-performance-eval
+# ===== Performance eval ======= #
+
+performance <- list()
+performance_all <- list()
+plots <- list()
+dat_test_list <- list(dat_test_J1, dat_test_J2, dat_test_LR1, dat_test_LR2)
+for(i in seq_along(1:4)){
+  
+  dat_test <- dat_test_list[[i]]
+  index <- index_list[[i]]
+  response <- response_list[[i]]
+  models <- varPart_list[[i]]
+
+
+# Predict on your test data
+predictions_full <- predict(models[[1]], newdata = dat_test)
+
+predictions_H1 <- predict(models[[2]], newdata = dat_test)
+predictions_H2 <- predict(models[[3]], newdata = dat_test)
+predictions_H3 <- predict(models[[4]], newdata = dat_test)
+predictions_H4 <- predict(models[[5]], newdata = dat_test)
+
+predictions_H1H2 <- predict(models[[6]], newdata = dat_test)
+predictions_H1H3 <- predict(models[[7]], newdata = dat_test)
+predictions_H1H4 <- predict(models[[8]], newdata = dat_test)
+predictions_H2H3 <- predict(models[[9]], newdata = dat_test)
+predictions_H2H4 <- predict(models[[10]], newdata = dat_test)
+predictions_H3H4 <- predict(models[[11]], newdata = dat_test)
+
+predictions_H1H2H3 <- predict(models[[12]], newdata = dat_test)
+predictions_H1H2H4 <- predict(models[[13]], newdata = dat_test)
+predictions_H1H3H4 <- predict(models[[14]], newdata = dat_test)
+predictions_H2H3H4 <- predict(models[[15]], newdata = dat_test)
+
+# Calculate the performance metrics
+perf <- rbind(postResample(pred = predictions_full, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H1, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H2, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H3, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H4, obs = dat_test %>% pull(response)),
+              
+              postResample(pred = predictions_H1H2, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H1H3, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H1H4, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H2H3, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H2H4, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H3H4, obs = dat_test %>% pull(response)),
+              
+              postResample(pred = predictions_H1H2H3, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H1H2H4, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H1H3H4, obs = dat_test %>% pull(response)),
+              postResample(pred = predictions_H2H3H4, obs = dat_test %>% pull(response))) %>% 
+                as.data.frame() %>% 
+                round(4)
+
+model <- c("full", 
+            seq(1:4), 
+            "H1H2", "H1H3", "H1H4", "H2H3", "H2H4", "H3H4", 
+            "H1H2H3", "H1H2H4", "H1H3H4", "H2H3H4")
+perf$model <- model
+perf$subset <- paste0(response,"_", i)
+
+# Print the performance metrics
+
+perf %>% 
+    kableExtra::kable()
+perf %>% 
+    kableExtra::kable() %>% 
+    write.csv(paste0("data/csv/performance_varExpl_rf_loop_", response,"_",i, ".csv"))
+
+performance[[i]] <- slice_min(perf, RMSE) %>% 
+    slice_max(Rsquared)
+
+performance_all[[i]] <- perf
+
+# Create a bar plot of variance explained
+plots[[i]] <- ggplot(perf, aes(x = reorder(model, RMSE), y = Rsquared)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Model", y = "Variance Explained") +
+  theme_minimal()
+}
+
+do.call(rbind, performance) %>% kableExtra::kable()
+do.call(rbind, performance_all) %>% kableExtra::kable()
+
+plots
+
+```
+:::
+
+
+```{r}
+# save.image("data/RData/05_VarPart_loop.RData")
+```
