@@ -1,0 +1,40 @@
+project:
+  type: book
+
+book:
+  title: "Assignment Statistics KVHEM CZU SS 2024"
+  author: "MSc. Friederike Johanna Rosa Wölke"
+  cover-image: _img/cover.png
+  date: "7/4/2024"
+  search: true
+  repo-url: https://github.com/FriedaRosa/Assignment_Statistics_KVHEM_CZU_SS2024
+  repo-actions: [edit]
+  downloads: [pdf, epub]
+  chapters:
+    - index.qmd
+    - 01_DataPrep.qmd
+    - 02_rfe.qmd
+    - 03_HyperparameterTuning.qmd
+    - 04_FinalModels.qmd
+    - 05_VarPart_v2_loop.qmd
+    - 06_Predictions.qmd
+    - 07_references.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme: united
+    toc: true
+    code-overflow: wrap
+    monofont: Cascadia Code
+
+comments:
+  hypothesis: true
+  
+output:
+  quarto::html_document:
+    self_contained: true
+    toc: true
+    number_sections: true
+    keep_md: true

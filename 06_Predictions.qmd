@@ -1,0 +1,70 @@
+---
+title: "Script 6 - Predictions"
+author: 
+  - name: "MSc. Friederike Johanna Rosa Wölke"
+    orcid: "0000-0001-9034-4883"
+    url: "https://friedarosa.github.io"
+    email: "wolke@fzp.czu.cz"
+    corresponding: true
+date: "2023-06-29"
+---
+
+```{r}
+rm(list=ls())
+source("src/functions.R")
+load("data/RData/01_Data_prep.RData")
+all_models <- readRDS("data/models/reducedModels/03_List_all_reduced_models.rds")[c("Jaccard1", "LogRatio1")]
+```
+
+```{r}
+install_and_load(c("dplyr", "caret", "caretEnsemble"))
+```
+
+```{r}
+## Predict Jaccard
+file_path <- "data/AllPredictors.rds"
+tp <- 2
+vars <- c(H1_vars, H2_vars, H3_vars, H4_vars)
+
+dat <- readRDS(file_path) %>% 
+  filter(cell_grouping == 1 & exclude == 0 & tp == tp_value) %>% 
+  select(all_of(c( "verbatim_name", vars))) %>% 
+  mutate(
+    D_AOO_a = case_when(
+      is.na(D_AOO_a) & rel_occ_Ncells > 0.97 ~ 2,
+      TRUE ~ D_AOO_a),
+    mean_prob_cooccur = case_when(
+      is.na(mean_prob_cooccur) & rel_occ_Ncells < 0.05 ~ 0, 
+      TRUE ~ mean_prob_cooccur)) %>%
+  filter(!is.na(moran)) %>% 
+  mutate_if(
+    is.character, as.factor) %>%
+  mutate_at(
+    vars(c(Habitat.Density, Migration)), as.factor) %>%
+  na.omit()
+
+
+
+```
+
+```{r}
+dat$Jacc_pred <- predict(all_models["Jaccard1"]$Jaccard1$ranger, newdata = dat)
+
+dat$LogRatio_pred <- predict(all_models["LogRatio1"]$LogRatio1$ranger, newdata = dat)
+
+```
+
+```{r}
+ggplot(data = dat)+
+  geom_histogram(aes(Jacc_pred, fill = dataset))+
+  facet_wrap(~dataset)+
+  theme_classic()+
+    geom_vline(xintercept = c(1,0))
+
+
+ggplot(data = dat)+
+  geom_histogram(aes(LogRatio_pred, fill = dataset))+
+  facet_wrap(~dataset)+
+  theme_classic()+
+  geom_vline(xintercept = c(0))
+```

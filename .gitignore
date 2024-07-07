@@ -3,8 +3,9 @@
 .Rapp.history
 
 # Session Data files
-.RData
-.RDataTmp
+*.RData
+*.rds
+*.RDataTmp
 
 # User-specific files
 .Ruserdata
@@ -47,7 +48,6 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
-*.rds
-*.RData
 
-*.RDataTmp
+
+*.csv
